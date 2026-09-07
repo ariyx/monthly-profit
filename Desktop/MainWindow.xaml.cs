@@ -151,12 +151,13 @@ public partial class MainWindow : Window
             var print = new PrintDialog(); if (print.ShowDialog() != true) return;
             var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("Tahoma"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth };
             var t = Rules.Summarize(current);
-            doc.Blocks.Add(new Paragraph(new Run("گزارش ماه " + current.Key + " — همه مبلغ‌ها ریال")) { FontSize = 20 });
+            doc.Blocks.Add(new Paragraph(new Run("متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold });
+            doc.Blocks.Add(new Paragraph(new Run("گزارش ماه " + current.Key + " — همه مبلغ‌ها ریال")) { FontSize = 15 });
             doc.Blocks.Add(new Paragraph(new Run($"خرید: {Rules.Money(t.Cost)}\nفروش: {Rules.Money(t.Sales)}\nسود ناخالص: {Rules.Money(t.Profit)}\nهزینه ثابت: {Rules.Money(t.FixedCost)}\nنتیجه ماه: {Rules.Money(t.Net)}\nحاشیه سود کل: {Rules.Percent(t.Margin)}")));
             var table = new Table { CellSpacing = 0 }; for (int i = 0; i < 5; i++) table.Columns.Add(new TableColumn()); var body = new TableRowGroup(); table.RowGroups.Add(body);
             void Row(params string[] texts) { var row = new TableRow(); foreach (var text in texts) row.Cells.Add(new TableCell(new Paragraph(new Run(text))) { Padding = new Thickness(5), BorderBrush = Brushes.LightGray, BorderThickness = new Thickness(0, 0, 0, 1) }); body.Rows.Add(row); }
             Row("برند / کالا", "مقدار", "فروش", "سود", "حاشیه"); foreach (var p in current.Products) { var r = Rules.Calculate(p); Row(p.Brand + " / " + p.Name, Rules.Money(p.Quantity), Rules.Money(r.Sales), Rules.Money(r.Profit), Rules.Percent(r.Margin)); }
-            doc.Blocks.Add(table); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key);
+            doc.Blocks.Add(table); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Mottahed Tovzie Iranian " + current.Key);
         });
     }
 }

@@ -11,9 +11,10 @@ public sealed class InstallWindow : Window
 {
     public InstallWindow()
     {
-        Title = "نصب مدیریت سود ماهانه"; Width = 520; Height = 350; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Title = "نصب متحد توزیع ایرانیان"; Width = 520; Height = 350; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterScreen;
         var panel = new StackPanel { Margin = new Thickness(28) }; Content = panel;
-        panel.Children.Add(new TextBlock { Text = "مدیریت سود ماهانه", FontSize = 23, Margin = new Thickness(0, 0, 0, 18) });
+        panel.Children.Add(new TextBlock { Text = "متحد توزیع ایرانیان", FontSize = 23, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 5) });
+        panel.Children.Add(new TextBlock { Text = "سامانه مدیریت سود ماهانه", FontSize = 14, Margin = new Thickness(0, 0, 0, 18) });
         panel.Children.Add(new TextBlock { Text = "نصب برای همین کاربر ویندوز انجام می‌شود.\nاطلاعات ماه‌های قبلی حفظ می‌شوند.\nExcel یا ابزار برنامه‌نویسی لازم نیست.", TextWrapping = TextWrapping.Wrap, LineHeight = 28 });
         var result = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 14, 0, 8) }; panel.Children.Add(result);
         var install = new Button { Content = "نصب و اجرای برنامه", Style = (Style)FindResource("Primary") }; panel.Children.Add(install);
