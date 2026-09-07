@@ -53,8 +53,9 @@ public partial class MainWindow : Window
     {
         var t = Rules.Summarize(current);
         Sales.Text = Rules.Money(t.Sales); Profit.Text = Rules.Money(t.Profit); Net.Text = Rules.Money(t.Net);
-        Net.Foreground = t.Net < 0 ? Brushes.Firebrick : Brushes.SeaGreen;
+        Net.Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51));
         NetLabel.Text = t.Net < 0 ? "زیان ماه" : t.Net > 0 ? "سود ماه" : "پوشش هزینه ثابت";
+        NetLabel.Foreground = t.Net < 0 ? Brushes.Firebrick : t.Net > 0 ? Brushes.SeaGreen : Brushes.SlateGray;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin);
         Fixed.Text = Rules.Money(current.FixedCost);
         Breakdown.Text = $"بهای تمام‌شده خرید: {Rules.Money(t.Cost)} ریال\nفروش نقدی: {Rules.Money(t.Cash)} ریال\nفروش چکی: {Rules.Money(t.Credit)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}";
@@ -149,7 +150,7 @@ public partial class MainWindow : Window
         if (!ResolveFixedEdit()) return;
         Guard(() => {
             var print = new PrintDialog(); if (print.ShowDialog() != true) return;
-            var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("Tahoma"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth };
+            var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth };
             var t = Rules.Summarize(current);
             doc.Blocks.Add(new Paragraph(new Run("متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold });
             doc.Blocks.Add(new Paragraph(new Run("گزارش ماه " + current.Key + " — همه مبلغ‌ها ریال")) { FontSize = 15 });

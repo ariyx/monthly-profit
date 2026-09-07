@@ -44,7 +44,7 @@ public sealed class ProductDialog : Window
         }
         void Field(Panel grid, string key, string label, string value, bool numeric = true)
         {
-            var panel = FieldPanel(label); var tb = new TextBox { Text = value, FlowDirection = numeric ? FlowDirection.LeftToRight : FlowDirection.RightToLeft };
+            var panel = FieldPanel(label); var tb = new TextBox { Text = value, FlowDirection = FlowDirection.RightToLeft };
             fields[key] = tb; panel.Children.Add(tb); grid.Children.Add(panel); tb.TextChanged += (_, _) => { if (initialized) Preview(); };
         }
         string Num(decimal x) => x.ToString("0.########", CultureInfo.InvariantCulture);
@@ -95,7 +95,7 @@ public sealed class MonthDialog : Window
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 17), Child = new TextBlock { Text = Title, FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White } }; root.Children.Add(header);
         var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 24) }; Grid.SetRow(panel, 1); root.Children.Add(panel);
-        panel.Children.Add(new TextBlock { Text = "ماه شمسی", FontWeight = FontWeights.SemiBold }); var input = new TextBox { Text = suggested, FlowDirection = FlowDirection.LeftToRight }; panel.Children.Add(input);
+        panel.Children.Add(new TextBlock { Text = "ماه شمسی", FontWeight = FontWeights.SemiBold }); var input = new TextBox { Text = suggested, FlowDirection = FlowDirection.RightToLeft }; panel.Children.Add(input);
         panel.Children.Add(new TextBlock { Text = copy ? "کالاها و درصدها به‌صورت مستقل کپی می‌شوند." : "ماه خالی با هزینهٔ ثابت ماه جاری ساخته می‌شود.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 4, 0, 7) });
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 8), TextWrapping = TextWrapping.Wrap }; panel.Children.Add(error);
         var button = new Button { Content = "ایجاد ماه", IsDefault = true, Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Left }; panel.Children.Add(button);
