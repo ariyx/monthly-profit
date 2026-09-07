@@ -1,0 +1,44 @@
+اصلاح خطای ساخت GitHub Actions
+
+علت:
+ExcelTransfer.cs در مخزن شما از نام‌های قدیمی ProfitToman، SellPrice، ProfitPercent، ProfitMargin، ProfitMarginPercent و Revenue استفاده می‌کند.
+این نام‌ها در مدل فعلی برنامه وجود ندارند.
+
+روش ساده:
+۱. کل پوشه‌های Core و Desktop و Tests و فایل‌های build-windows.ps1، Directory.Build.props، USER-GUIDE.fa.txt و .github را با محتویات همین بسته جایگزین کنید.
+۲. سپس در PowerShell داخل پوشه پروژه اجرا کنید:
+   git add .
+   git commit -m "Fix Excel export and SQLite dependency"
+   git push
+۳. در GitHub بخش Actions اجرای تازه را باز کنید.
+
+در فایل ExcelTransfer.cs، بخش درست خروجی اکسل این است:
+
+foreach (var p in month.Products)
+{
+    var r = Rules.Calculate(p);
+    rows.Add([
+        p.Brand, p.Name, p.Price, p.Quantity,
+        p.Discount, p.Offer, p.Markup, p.CreditShare, p.CashShare, p.CashDiscount,
+        r.Cost, r.UnitSale, r.Cash, r.Credit, r.Sales, r.Profit, r.Margin
+    ]);
+}
+
+و بخش درست خلاصه ماه:
+
+List<object?[]> summary = [
+    ["عنوان", "مقدار"],
+    ["ماه شمسی", month.Key],
+    ["واحد پول", "ریال"],
+    ["بهای تمام‌شده", total.Cost],
+    ["فروش کل", total.Sales],
+    ["سود ناخالص", total.Profit],
+    ["هزینه ثابت ماه", total.FixedCost],
+    ["سود / زیان پس از هزینه ثابت", total.Net],
+    ["حاشیه سود", total.Margin],
+    ["نوع گزارش", "خروجی مقادیر محاسبه‌شده؛ درصدها به‌صورت اعشاری ذخیره شده‌اند"],
+    ["نسخه قواعد", month.FormulaVersion]
+];
+
+بهبود امنیتی:
+فایل Core/Profit.Core.csproj حالا بسته SQLitePCLRaw.bundle_e_sqlite3 نسخه 3.0.3 را مستقیماً اضافه می‌کند. این نسخه SQLite امن‌تر را جایگزین وابستگی قدیمی SQLitePCLRaw.lib.e_sqlite3 نسخه 2.1.11 می‌کند.
