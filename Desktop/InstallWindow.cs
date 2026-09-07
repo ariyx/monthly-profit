@@ -32,9 +32,10 @@ public sealed class InstallWindow : Window
                     var staging = executable + ".new";
                     try { File.Copy(Environment.ProcessPath ?? throw new IOException("مسیر نصب‌کننده یافت نشد."), staging, true); File.Move(staging, executable, true); }
                     finally { if (File.Exists(staging)) File.Delete(staging); }
-                    MakeShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "مدیریت سود ماهانه.lnk"), executable);
+                    // Some Windows code pages cannot marshal Persian shortcut filenames through WScript.Shell.
+                    TryMakeShortcut(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "Monthly Profit.lnk"), executable);
                     var menu = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.StartMenu), "Programs", "MonthlyProfit"); Directory.CreateDirectory(menu);
-                    MakeShortcut(Path.Combine(menu, "مدیریت سود ماهانه.lnk"), executable);
+                    TryMakeShortcut(Path.Combine(menu, "Monthly Profit.lnk"), executable);
                     result.Text = "نصب انجام شد.";
                     installedPath = executable;
                 }
@@ -45,11 +46,15 @@ public sealed class InstallWindow : Window
             catch (Exception ex) { result.Text = "نصب کامل نشد: " + ex.Message; }
         };
     }
-    static void MakeShortcut(string path, string executable)
+    static void TryMakeShortcut(string path, string executable)
     {
-        var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new IOException("ساخت میانبر ویندوز در دسترس نیست.");
-        dynamic shell = Activator.CreateInstance(type)!; dynamic shortcut = shell.CreateShortcut(path);
-        try { shortcut.TargetPath = executable; shortcut.WorkingDirectory = Path.GetDirectoryName(executable); shortcut.Description = "مدیریت سود ماهانه"; shortcut.Save(); }
-        finally { Marshal.FinalReleaseComObject(shortcut); Marshal.FinalReleaseComObject(shell); }
+        try
+        {
+            var type = Type.GetTypeFromProgID("WScript.Shell") ?? throw new IOException("ساخت میانبر ویندوز در دسترس نیست.");
+            dynamic shell = Activator.CreateInstance(type)!; dynamic shortcut = shell.CreateShortcut(path);
+            try { shortcut.TargetPath = executable; shortcut.WorkingDirectory = Path.GetDirectoryName(executable); shortcut.Description = "Monthly Profit"; shortcut.Save(); }
+            finally { Marshal.FinalReleaseComObject(shortcut); Marshal.FinalReleaseComObject(shell); }
+        }
+        catch { /* The installed executable remains usable even when shortcut creation is blocked. */ }
     }
 }
