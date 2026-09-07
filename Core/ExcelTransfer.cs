@@ -80,7 +80,7 @@ public static class ExcelTransfer
                     return new XElement(S + "worksheet", new XElement(S + "sheetViews", new XElement(S + "sheetView", new XAttribute("workbookViewId", "0"), new XAttribute("rightToLeft", "1"), new XElement(S + "pane", new XAttribute("ySplit", "1"), new XAttribute("topLeftCell", "A2"), new XAttribute("state", "frozen")))), new XElement(S + "cols", new XElement(S + "col", new XAttribute("min", "1"), new XAttribute("max", data[0].Length), new XAttribute("width", width), new XAttribute("customWidth", "1"))), new XElement(S + "sheetData", data.Select((row, i) => new XElement(S + "row", new XAttribute("r", i + 1), new XAttribute("ht", i == 0 ? 40 : 24), new XAttribute("customHeight", "1"), row.Select((v, j) => {
                         bool numeric = v is decimal or int; int style = i == 0 ? 3 : !numeric ? 0 : products && ((j >= 4 && j <= 9) || j == 16) || !products && i == 8 && j == 1 ? 2 : 1;
                         return new XElement(S + "c", new XAttribute("r", Col(j + 1) + (i + 1)), new XAttribute("s", style), numeric ? new XElement(S + "v", Convert.ToString(v, CultureInfo.InvariantCulture)) : new object[] { new XAttribute("t", "inlineStr"), new XElement(S + "is", new XElement(S + "t", v?.ToString() ?? "")) });
-                    }))));
+                    })))));
                 }
                 Put("xl/worksheets/sheet1.xml", Sheet(rows, true).ToString()); Put("xl/worksheets/sheet2.xml", Sheet(summary, false).ToString());
             }
