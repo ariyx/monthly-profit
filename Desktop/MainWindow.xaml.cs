@@ -5,7 +5,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
-using System.Windows.Shapes;
 using Microsoft.Win32;
 using Profit.Core;
 
@@ -171,11 +170,11 @@ public partial class MainWindow : Window
         var selected = new List<(string Name, Brush Brush, Func<Total, decimal> Get)>(); if (TrendSales.IsChecked == true) selected.Add(("فروش", Brushes.SteelBlue, x => x.Sales)); if (TrendProfit.IsChecked == true) selected.Add(("سود", Brushes.SeaGreen, x => x.Profit)); if (TrendNet.IsChecked == true) selected.Add(("نتیجه", Brushes.Firebrick, x => x.Net)); if (selected.Count == 0) return;
         var totals = reportMonths.Select(Rules.Summarize).ToList(); var values = selected.SelectMany(s => totals.Select(s.Get)).ToList(); var min = Math.Min(0, values.Min()); var max = Math.Max(0, values.Max()); if (min == max) { min -= 1; max += 1; } var pad = 30d; var chartW = width - pad * 2; var chartH = height - 48;
         double X(int i) => pad + chartW * i / (reportMonths.Count - 1); double Y(decimal v) => 16 + (double)((max - v) / (max - min)) * chartH;
-        var zero = new Line { X1 = pad, X2 = width - pad, Y1 = Y(0), Y2 = Y(0), Stroke = Brushes.LightGray, StrokeThickness = 1 }; TrendCanvas.Children.Add(zero);
+        var zero = new System.Windows.Shapes.Line { X1 = pad, X2 = width - pad, Y1 = Y(0), Y2 = Y(0), Stroke = Brushes.LightGray, StrokeThickness = 1 }; TrendCanvas.Children.Add(zero);
         foreach (var series in selected)
         {
-            var line = new Polyline { Stroke = series.Brush, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round }; for (var i = 0; i < totals.Count; i++) line.Points.Add(new Point(X(i), Y(series.Get(totals[i])))); TrendCanvas.Children.Add(line);
-            for (var i = 0; i < totals.Count; i++) { var p = new Ellipse { Width = 8, Height = 8, Fill = series.Brush, ToolTip = $"{reportMonths[i].Key}\n{series.Name}: {Rules.Money(series.Get(totals[i]))} ریال\nفروش: {Rules.Money(totals[i].Sales)} ریال\nسود ناخالص: {Rules.Money(totals[i].Profit)} ریال\nهزینه ثابت: {Rules.Money(totals[i].FixedCost)} ریال\nنتیجه: {Rules.Money(totals[i].Net)} ریال" }; Canvas.SetLeft(p, X(i) - 4); Canvas.SetTop(p, Y(series.Get(totals[i])) - 4); TrendCanvas.Children.Add(p); }
+            var line = new System.Windows.Shapes.Polyline { Stroke = series.Brush, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round }; for (var i = 0; i < totals.Count; i++) line.Points.Add(new Point(X(i), Y(series.Get(totals[i])))); TrendCanvas.Children.Add(line);
+            for (var i = 0; i < totals.Count; i++) { var p = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = series.Brush, ToolTip = $"{reportMonths[i].Key}\n{series.Name}: {Rules.Money(series.Get(totals[i]))} ریال\nفروش: {Rules.Money(totals[i].Sales)} ریال\nسود ناخالص: {Rules.Money(totals[i].Profit)} ریال\nهزینه ثابت: {Rules.Money(totals[i].FixedCost)} ریال\nنتیجه: {Rules.Money(totals[i].Net)} ریال" }; Canvas.SetLeft(p, X(i) - 4); Canvas.SetTop(p, Y(series.Get(totals[i])) - 4); TrendCanvas.Children.Add(p); }
         }
         for (var i = 0; i < reportMonths.Count; i++) { var label = new TextBlock { Text = reportMonths[i].Key, FontSize = 10, Foreground = Brushes.DimGray }; Canvas.SetLeft(label, X(i) - 24); Canvas.SetTop(label, height - 22); TrendCanvas.Children.Add(label); }
     }
