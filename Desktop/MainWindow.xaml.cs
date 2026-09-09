@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent(); store = new Store(Path.Combine(DataDirectory, "monthly-profit.sqlite"));
+        Fixed.LostFocus += (_, _) => FormatMoney(Fixed);
         if (store.Keys().Count == 0) { var pc = new PersianCalendar(); var now = DateTime.Today; store.Save(new Month { Key = $"{pc.GetYear(now):0000}/{pc.GetMonth(now):00}" }); }
         Reload();
         Closing += (_, e) => { if (!ResolveFixedEdit()) e.Cancel = true; };
@@ -31,7 +32,12 @@ public partial class MainWindow : Window
     }
     void Reload(string? key = null)
     {
-        loading = true; var keys = store.Keys(); Months.ItemsSource = keys; Months.SelectedItem = key != null && keys.Contains(key) ? key : keys.FirstOrDefault(); loading = false;
+        loading = true; var keys = store.Keys(); var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string;
+        Months.ItemsSource = keys; Months.SelectedItem = key != null && keys.Contains(key) ? key : keys.FirstOrDefault();
+        HistoryFrom.ItemsSource = keys; HistoryTo.ItemsSource = keys;
+        HistoryFrom.SelectedItem = from != null && keys.Contains(from) ? from : null;
+        HistoryTo.SelectedItem = to != null && keys.Contains(to) ? to : null;
+        loading = false;
         if (Months.SelectedItem is string k) { current = store.Load(k); deleted = null; Draw(); }
     }
     bool ResolveFixedEdit()
@@ -53,7 +59,7 @@ public partial class MainWindow : Window
     {
         var t = Rules.Summarize(current);
         Sales.Text = Rules.Money(t.Sales); Profit.Text = Rules.Money(t.Profit); Net.Text = Rules.Money(t.Net);
-        Net.Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51));
+        Net.Foreground = t.Net < 0 ? Brushes.Firebrick : t.Net > 0 ? Brushes.SeaGreen : Brushes.SlateGray;
         NetLabel.Text = t.Net < 0 ? "زیان ماه" : t.Net > 0 ? "سود ماه" : "پوشش هزینه ثابت";
         NetLabel.Foreground = t.Net < 0 ? Brushes.Firebrick : t.Net > 0 ? Brushes.SeaGreen : Brushes.SlateGray;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin);
@@ -64,12 +70,17 @@ public partial class MainWindow : Window
         var groups = current.Products.GroupBy(p => Rules.Normalize(p.Brand)).Select(g => new BrandRow(g.Key, g.Count(), g.Sum(p => Rules.Calculate(p).Sales), g.Sum(p => Rules.Calculate(p).Profit))).OrderByDescending(g => g.Profit).ToList();
         foreach (var g in groups) g.Rank = 1 + groups.Count(x => x.Profit > g.Profit);
         BrandsGrid.ItemsSource = groups;
-        HistoryGrid.ItemsSource = store.Keys().Select(k => new HistoryRow(store.Load(k))).ToList();
+        DrawHistory();
         Status.Text = $"ماه {current.Key} · تغییرات ثبت‌شده · نسخه پرونده {current.Revision}";
     }
     void Save(Month next)
     {
         store.Save(next); current = next; Draw();
+    }
+    void FormatMoney(TextBox box)
+    {
+        try { if (!string.IsNullOrWhiteSpace(box.Text)) box.Text = Rules.Money(Rules.Number(box.Text)); }
+        catch { /* خطا در اعتبارسنجی هنگام ثبت نمایش داده می‌شود. */ }
     }
     void CreateMonth(bool clone)
     {
@@ -81,6 +92,29 @@ public partial class MainWindow : Window
     }
     void NewMonth(object s, RoutedEventArgs e) => CreateMonth(false);
     void CloneMonth(object s, RoutedEventArgs e) => CreateMonth(true);
+    void EditMonth(object s, RoutedEventArgs e)
+    {
+        if (!ResolveFixedEdit()) return;
+        var dialog = new MonthDialog(current.Key, false, true) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Key == current.Key) return;
+        Guard(() => {
+            var safety = store.CreateSafetyBackup("before-rename");
+            var renamed = store.Rename(current, dialog.Key); Reload(renamed.Key);
+            Status.Text = "ماه ویرایش شد. پشتیبان ایمنی: " + safety;
+        });
+    }
+    void DeleteMonth(object s, RoutedEventArgs e)
+    {
+        if (!ResolveFixedEdit()) return;
+        if (store.Keys().Count <= 1) { MessageBox.Show(this, "آخرین ماه قابل حذف نیست. ابتدا یک ماه جدید ایجاد کنید.", "حذف ماه", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        var total = Rules.Summarize(current);
+        var prompt = $"ماه «{current.Key}» با {current.Products.Count} کالا و هزینه ثابت {Rules.Money(total.FixedCost)} ریال حذف شود؟\nاین کار فقط با بازیابی پشتیبان قابل برگشت است.";
+        if (MessageBox.Show(this, prompt, "حذف ماه", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Guard(() => {
+            var safety = store.CreateSafetyBackup("before-delete"); store.Delete(current); Reload();
+            Status.Text = "ماه حذف شد. پشتیبان ایمنی: " + safety;
+        });
+    }
     void SaveFixed(object s, RoutedEventArgs e) => Guard(() => Save(current with { FixedCost = Rules.Number(Fixed.Text) }));
     void AddProduct(object s, RoutedEventArgs e) => OpenEditor(null);
     void EditProduct(object s, RoutedEventArgs e) { if (ItemsGrid.SelectedItem is ProductRow r) OpenEditor(r.Product); }
@@ -139,6 +173,26 @@ public partial class MainWindow : Window
         });
     }
     void OpenDataFolder(object s, RoutedEventArgs e) => Guard(() => Process.Start(new ProcessStartInfo { FileName = DataDirectory, UseShellExecute = true }));
+    void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
+    void ClearHistoryFilter(object s, RoutedEventArgs e)
+    {
+        loading = true; HistoryFrom.SelectedItem = null; HistoryTo.SelectedItem = null; loading = false; DrawHistory();
+    }
+    void DrawHistory()
+    {
+        var keys = store.Keys(); var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string;
+        if (from != null && to != null && string.CompareOrdinal(from, to) > 0)
+        {
+            HistoryGrid.ItemsSource = Array.Empty<HistoryRow>();
+            HistorySummary.Text = "بازه ماه نامعتبر است: ماه آغاز باید پیش از ماه پایان باشد.";
+            return;
+        }
+        var months = keys.Where(k => (from == null || string.CompareOrdinal(k, from) >= 0) && (to == null || string.CompareOrdinal(k, to) <= 0)).Select(store.Load).ToList();
+        HistoryGrid.ItemsSource = months.Select(m => new HistoryRow(m)).ToList();
+        var totals = months.Select(Rules.Summarize).ToList();
+        var cost = totals.Sum(x => x.Cost); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit); var fixedCost = totals.Sum(x => x.FixedCost); var net = totals.Sum(x => x.Net);
+        HistorySummary.Text = months.Count == 0 ? "در این بازه ماهی ثبت نشده است." : $"{months.Count} ماه · بهای تمام‌شده: {Rules.Money(cost)} ریال · فروش: {Rules.Money(sales)} ریال · سود ناخالص: {Rules.Money(profit)} ریال · هزینه ثابت: {Rules.Money(fixedCost)} ریال · نتیجه: {Rules.Money(net)} ریال · حاشیه سود: {Rules.Percent(sales == 0 ? null : profit / sales)}";
+    }
     void LoadSample(object s, RoutedEventArgs e)
     {
         if (!ResolveFixedEdit()) return;
@@ -167,6 +221,7 @@ public sealed class ProductRow(Product p)
     public Product Product => p;
     public string Brand => p.Brand; public string Name => p.Name;
     public string PriceText => Rules.Money(p.Price); public string QuantityText => Rules.Money(p.Quantity);
+    public string CostText => Rules.Money(Rules.Calculate(p).Cost);
     public string SalesText => Rules.Money(Rules.Calculate(p).Sales); public string ProfitText => Rules.Money(Rules.Calculate(p).Profit); public string MarginText => Rules.Percent(Rules.Calculate(p).Margin);
 }
 public sealed class BrandRow(string brand, int count, decimal sales, decimal profit)

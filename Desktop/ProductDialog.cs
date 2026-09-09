@@ -61,13 +61,14 @@ public sealed class ProductDialog : Window
         {
             var panel = FieldPanel(label); var tb = new TextBox { Text = value, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right };
             fields[key] = tb; panel.Children.Add(tb); Place(panel, grid, column, row); tb.TextChanged += (_, _) => { if (initialized) Preview(); };
+            if (key is "price" or "quantity") tb.LostFocus += (_, _) => { try { if (!string.IsNullOrWhiteSpace(tb.Text)) tb.Text = Rules.Money(Rules.Number(tb.Text)); } catch { } };
         }
         string Num(decimal x) => x.ToString("0.########", CultureInfo.InvariantCulture);
 
         Section("مشخصات کالا", "برند را انتخاب کنید یا نام برند تازه‌ای تایپ کنید.");
         var identity = FieldsGrid(2, 2);
         var brandPanel = FieldPanel("برند"); brand.ItemsSource = all.Select(x => x.Brand).Distinct().OrderBy(x => x).ToList(); brand.Text = original.Brand; brandPanel.Children.Add(brand); Place(brandPanel, identity, 0, 0);
-        Field(identity, 1, 0, "name", "نام کالا", original.Name); Field(identity, 0, 1, "price", "قیمت خرید واحد — ریال", product == null ? "" : Num(original.Price)); Field(identity, 1, 1, "quantity", "تعداد / مقدار", Num(original.Quantity));
+        Field(identity, 1, 0, "name", "نام کالا", original.Name); Field(identity, 0, 1, "price", "قیمت خرید واحد — ریال", product == null ? "" : Rules.Money(original.Price)); Field(identity, 1, 1, "quantity", "تعداد / مقدار", Rules.Money(original.Quantity));
 
         Section("شرایط خرید", "تخفیف و آفر از مبلغ اولیهٔ خرید محاسبه می‌شوند.");
         var purchase = FieldsGrid(3, 1);
@@ -96,7 +97,7 @@ public sealed class ProductDialog : Window
     }
     void Preview()
     {
-        try { var r = Rules.Calculate(Read()); error.Text = ""; preview.Text = $"فروش واحد: {Rules.Money(r.UnitSale)} ریال\nفروش کل: {Rules.Money(r.Sales)} ریال   |   سود: {Rules.Money(r.Profit)} ریال\nحاشیه سود: {Rules.Percent(r.Margin)}"; }
+        try { var r = Rules.Calculate(Read()); error.Text = ""; preview.Text = $"بهای تمام‌شده: {Rules.Money(r.Cost)} ریال\nفروش واحد: {Rules.Money(r.UnitSale)} ریال\nفروش کل: {Rules.Money(r.Sales)} ریال   |   سود: {Rules.Money(r.Profit)} ریال\nحاشیه سود: {Rules.Percent(r.Margin)}"; }
         catch (Exception ex) { error.Text = ex.Message; preview.Text = ""; }
     }
 }
@@ -104,17 +105,17 @@ public sealed class ProductDialog : Window
 public sealed class MonthDialog : Window
 {
     public string Key { get; private set; } = "";
-    public MonthDialog(string suggested, bool copy)
+    public MonthDialog(string suggested, bool copy, bool edit = false)
     {
-        Title = copy ? "کپی به ماه جدید" : "ماه جدید"; Width = 440; Height = 335; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = edit ? "ویرایش ماه" : copy ? "کپی به ماه جدید" : "ماه جدید"; Width = 440; Height = 335; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid { FlowDirection = FlowDirection.RightToLeft }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 17), Child = new TextBlock { Text = Title, FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right } }; root.Children.Add(header);
         var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 24), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(panel, 1); root.Children.Add(panel);
         panel.Children.Add(new TextBlock { Text = "ماه شمسی", FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right }); var input = new TextBox { Text = suggested, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right }; panel.Children.Add(input);
-        panel.Children.Add(new TextBlock { Text = copy ? "کالاها و درصدها به‌صورت مستقل کپی می‌شوند." : "ماه خالی با هزینهٔ ثابت ماه جاری ساخته می‌شود.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 4, 0, 7), TextAlignment = TextAlignment.Right });
+        panel.Children.Add(new TextBlock { Text = edit ? "تغییر ماه، همهٔ کالاها و هزینهٔ ثابت همین ماه را حفظ می‌کند." : copy ? "کالاها و درصدها به‌صورت مستقل کپی می‌شوند." : "ماه خالی با هزینهٔ ثابت ماه جاری ساخته می‌شود.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 4, 0, 7), TextAlignment = TextAlignment.Right });
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 8), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error);
-        var button = new Button { Content = "ایجاد ماه", IsDefault = true, Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(button);
+        var button = new Button { Content = edit ? "ثبت تغییر ماه" : "ایجاد ماه", IsDefault = true, Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(button);
         button.Click += (_, _) => { var k = Rules.Digits(input.Text); if (!Rules.ValidMonth(k)) { error.Text = "قالب ماه باید مانند 1405/06 باشد."; return; } Key = k; DialogResult = true; };
     }
 }

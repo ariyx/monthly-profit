@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableWindowsTargeting>true</EnableWindowsTargeting><AssemblyName>MonthlyProfit</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest><DebugType>none</DebugType></PropertyGroup>
+  <PropertyGroup><OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework><UseWPF>true</UseWPF><EnableWindowsTargeting>true</EnableWindowsTargeting><AssemblyName>MonthlyProfit</AssemblyName><ApplicationManifest>app.manifest</ApplicationManifest><ApplicationIcon>Assets\app-icon.ico</ApplicationIcon><DebugType>none</DebugType></PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Core/Profit.Core.csproj" />
     <Resource Include="Assets\company-logo-cropped.png" />

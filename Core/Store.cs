@@ -41,6 +41,37 @@ public sealed class Store
         if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید.");
         tx.Commit(); month.Revision = next.Revision;
     }
+    public string CreateSafetyBackup(string operation)
+    {
+        var safe = string.Concat(operation.Where(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_'));
+        if (string.IsNullOrWhiteSpace(safe)) safe = "change";
+        var file = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "backups", safe + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".sqlite");
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file)!); Backup(file); return file;
+    }
+    public Month Rename(Month month, string nextKey)
+    {
+        Rules.Validate(month); if (month.Revision <= 0) throw new InvalidOperationException("ماه ذخیره‌نشده قابل تغییر نیست.");
+        if (!Rules.ValidMonth(nextKey)) throw new InvalidDataException("قالب ماه باید مانند 1405/06 باشد.");
+        if (month.Key == nextKey) return month;
+        var next = month with { Key = nextKey, Revision = month.Revision + 1 }; Rules.Validate(next);
+        using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
+        cmd.CommandText = "SELECT COUNT(*) FROM months WHERE key=$key"; cmd.Parameters.AddWithValue("$key", nextKey);
+        if (Convert.ToInt32(cmd.ExecuteScalar()) != 0) throw new InvalidDataException("این ماه قبلاً ایجاد شده است.");
+        cmd.Parameters.Clear(); cmd.CommandText = "INSERT INTO months(key,revision,data) VALUES($key,$revision,$data)";
+        cmd.Parameters.AddWithValue("$key", next.Key); cmd.Parameters.AddWithValue("$revision", next.Revision); cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(next, Rules.Json));
+        if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("تغییر ماه انجام نشد.");
+        cmd.Parameters.Clear(); cmd.CommandText = "DELETE FROM months WHERE key=$key AND revision=$revision";
+        cmd.Parameters.AddWithValue("$key", month.Key); cmd.Parameters.AddWithValue("$revision", month.Revision);
+        if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید.");
+        tx.Commit(); return next;
+    }
+    public void Delete(Month month)
+    {
+        if (month.Revision <= 0) throw new InvalidOperationException("ماه ذخیره‌نشده قابل حذف نیست.");
+        using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "DELETE FROM months WHERE key=$key AND revision=$revision";
+        cmd.Parameters.AddWithValue("$key", month.Key); cmd.Parameters.AddWithValue("$revision", month.Revision);
+        if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید.");
+    }
     public void Backup(string destination)
     {
         if (System.IO.Path.GetFullPath(destination).Equals(Path, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("پشتیبان باید در مسیر دیگری ذخیره شود.");

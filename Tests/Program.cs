@@ -21,6 +21,10 @@ try
     var db = new Store(Path.Combine(root, "data.sqlite")); db.Save(sample); var loaded = new Store(db.Path).Load(sample.Key); Equal(loaded.Products.Count, 6, "persistent restart");
     var copy = loaded.CopyTo("1405/07"); db.Save(copy); copy.Products[0] = copy.Products[0] with { Price = 77 }; db.Save(copy); Equal(db.Load("1405/06").Products[0].Price, 1000000m, "month isolation");
     var stale = db.Load(copy.Key); var fresh = db.Load(copy.Key); fresh.FixedCost = 9; db.Save(fresh); Throws(() => db.Save(stale), "optimistic revision");
+    var renameSafety = db.CreateSafetyBackup("before-rename"); Equal(File.Exists(renameSafety), true, "rename safety backup");
+    var renamed = db.Rename(db.Load("1405/07"), "1405/08"); Equal(renamed.Key, "1405/08", "month rename"); Throws(() => db.Load("1405/07"), "old month absent after rename");
+    Throws(() => db.Rename(db.Load("1405/08"), "1405/06"), "rename conflict");
+    var deleteSafety = db.CreateSafetyBackup("before-delete"); db.Delete(db.Load("1405/08")); Equal(File.Exists(deleteSafety), true, "delete safety backup"); Throws(() => db.Load("1405/08"), "month delete");
     var backup = Path.Combine(root, "backup.sqlite"); db.Backup(backup); var m = db.Load("1405/06"); m.FixedCost = 0; db.Save(m); db.Restore(backup); Equal(db.Load("1405/06").FixedCost, 52000000m, "backup restore");
     var invalid = Path.Combine(root, "invalid.sqlite"); File.WriteAllText(invalid, "not a database"); Throws(() => db.Restore(invalid), "invalid backup"); Equal(db.Load("1405/06").Products.Count, 6, "failed restore leaves data intact");
     var export = Path.Combine(root, "roundtrip.xlsx"); ExcelTransfer.Export(sample, export); var rows = ExcelTransfer.Import(export); Equal(rows.Count, 6, "Excel roundtrip count"); Equal(Rules.Summarize(new Month { Key = sample.Key, Products = rows }).Profit, t.Profit, "Excel precision roundtrip");

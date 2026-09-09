@@ -13,6 +13,7 @@ The actual input workbook remains the source of the six-row reference dataset. I
 - Tests: executable acceptance suite for financial outcomes, zero-sales handling, persistence, backup, month independence and spreadsheet roundtrip.
 - build-windows.ps1: runs tests and packages the self-contained installer. For the build operator, not the end user.
 - .github/workflows/windows-build.yml: Windows hosted build; not run or uploaded automatically in this conversation.
+- TODO.fa.md: فهرست کارهای تأییدشده و موارد نیازمند تصمیم محصول.
 
 ## Build operator
 
