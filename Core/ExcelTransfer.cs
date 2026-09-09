@@ -101,10 +101,13 @@ public static class ExcelTransfer
     {
         if (months.Count == 0) throw new InvalidDataException("برای خروجی بازه، حداقل یک ماه لازم است.");
         foreach (var m in months) Rules.Validate(m);
-        var rows = new List<object?[]> { ["ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود"] };
+        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
         foreach (var m in months.OrderBy(x => x.Key)) { var t = Rules.Summarize(m); rows.Add([m.Key, t.Cost, t.Sales, t.Profit, t.FixedCost, t.Net, t.Margin]); }
         var totals = months.Select(Rules.Summarize).ToList(); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit);
-        var summary = new List<object?[]> { ["عنوان", "مقدار"], ["از ماه", months.Min(x => x.Key)], ["تا ماه", months.Max(x => x.Key)], ["تعداد ماه", months.Count], ["بهای تمام‌شده", totals.Sum(x => x.Cost)], ["فروش کل", sales], ["سود ناخالص", profit], ["هزینه ثابت", totals.Sum(x => x.FixedCost)], ["نتیجه", totals.Sum(x => x.Net)], ["حاشیه سود وزنی", sales == 0 ? null : profit / sales] };
+        var summary = new List<object?[]>
+        {
+            new object?[] { "عنوان", "مقدار" }, new object?[] { "از ماه", months.Min(x => x.Key) }, new object?[] { "تا ماه", months.Max(x => x.Key) }, new object?[] { "تعداد ماه", months.Count }, new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود ناخالص", profit }, new object?[] { "هزینه ثابت", totals.Sum(x => x.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : profit / sales }
+        };
         WriteSimpleWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه");
     }
     static void WriteSimpleWorkbook(string file, List<object?[]> rows, List<object?[]> summary, string firstName, string secondName)
