@@ -61,7 +61,7 @@ public sealed class ProductDialog : Window
         {
             var panel = FieldPanel(label); var tb = new TextBox { Text = value, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right };
             fields[key] = tb; panel.Children.Add(tb); Place(panel, grid, column, row); tb.TextChanged += (_, _) => { if (initialized) Preview(); };
-            if (key is "price" or "quantity") tb.LostFocus += (_, _) => { try { if (!string.IsNullOrWhiteSpace(tb.Text)) tb.Text = Rules.Money(Rules.Number(tb.Text)); } catch { } };
+            if (key is "price" or "quantity") MoneyInput.Attach(tb);
         }
         string Num(decimal x) => x.ToString("0.########", CultureInfo.InvariantCulture);
 
@@ -117,5 +117,69 @@ public sealed class MonthDialog : Window
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 8), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error);
         var button = new Button { Content = edit ? "ثبت تغییر ماه" : "ایجاد ماه", IsDefault = true, Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(button);
         button.Click += (_, _) => { var k = Rules.Digits(input.Text); if (!Rules.ValidMonth(k)) { error.Text = "قالب ماه باید مانند 1405/06 باشد."; return; } Key = k; DialogResult = true; };
+    }
+}
+
+public sealed class FixedExpensesDialog : Window
+{
+    readonly List<(TextBox Title, TextBox Amount)> rows = [];
+    readonly StackPanel list = new() { FlowDirection = FlowDirection.RightToLeft };
+    public List<FixedExpense>? Value { get; private set; }
+    public FixedExpensesDialog(Month month)
+    {
+        Title = "ریز هزینه‌های ثابت"; Width = 620; Height = 570; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
+        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(22, 17, 22, 15), Child = new StackPanel { Children = { new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right }, new TextBlock { Text = "جمع ردیف‌ها، هزینه ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 5, 0, 0) } } } });
+        var body = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(body, 1); root.Children.Add(body);
+        var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 350 }; body.Children.Add(scroll);
+        void Add(FixedExpense? item = null)
+        {
+            var row = new Grid { Margin = new Thickness(0, 3, 0, 3) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه" };
+            var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال" }; MoneyInput.Attach(amount);
+            var remove = new Button { Content = "حذف", Margin = new Thickness(4) };
+            Grid.SetColumn(title, 0); Grid.SetColumn(amount, 1); Grid.SetColumn(remove, 2); row.Children.Add(title); row.Children.Add(amount); row.Children.Add(remove); list.Children.Add(row); rows.Add((title, amount));
+            remove.Click += (_, _) => { list.Children.Remove(row); rows.RemoveAll(x => ReferenceEquals(x.Title, title)); };
+        }
+        foreach (var item in month.FixedExpenses) Add(item);
+        if (rows.Count == 0 && month.FixedCost > 0) Add(new FixedExpense { Title = "هزینه ثابت ماه", Amount = month.FixedCost });
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) }; body.Children.Add(actions);
+        var add = new Button { Content = "+ افزودن ردیف" }; actions.Children.Add(add); add.Click += (_, _) => Add();
+        var save = new Button { Content = "ثبت هزینه‌ها", Style = (Style)FindResource("Primary") }; actions.Children.Add(save);
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                var values = rows.Where(x => !string.IsNullOrWhiteSpace(x.Title.Text) || !string.IsNullOrWhiteSpace(x.Amount.Text)).Select(x => new FixedExpense { Title = Rules.Normalize(x.Title.Text), Amount = Rules.Number(x.Amount.Text) }).ToList();
+                if (values.Any(x => string.IsNullOrWhiteSpace(x.Title))) throw new InvalidDataException("عنوان همه هزینه‌ها الزامی است.");
+                if (values.Any(x => x.Amount < 0)) throw new InvalidDataException("مبلغ هزینه نمی‌تواند منفی باشد.");
+                Value = values; DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "ثبت هزینه‌ها", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+    }
+}
+
+public sealed class ImportReviewDialog : Window
+{
+    public List<Product> Products { get; }
+    public ImportReviewDialog(ImportReview review, IReadOnlyCollection<Product> existing)
+    {
+        Title = "بازبینی ورود Excel"; Width = 700; Height = 560; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var existingKeys = existing.Select(x => Rules.Normalize(x.Brand) + "\u001f" + Rules.Normalize(x.Name)).ToHashSet(); var seen = new HashSet<string>();
+        var duplicates = new List<string>();
+        Products = review.Products.Where(p => { var key = Rules.Normalize(p.Brand) + "\u001f" + Rules.Normalize(p.Name); var duplicate = !seen.Add(key) || existingKeys.Contains(key); if (duplicate) duplicates.Add(p.Brand + " / " + p.Name); return !duplicate; }).ToList();
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
+        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(22, 17, 22, 15), Child = new TextBlock { Text = "بازبینی ورود Excel", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right } });
+        var panel = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(panel, 1); root.Children.Add(panel);
+        panel.Children.Add(new TextBlock { Text = $"ردیف قابل ورود: {Products.Count}   |   ردیف خطادار: {review.Issues.Count}   |   تکراری: {duplicates.Count}", FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right });
+        panel.Children.Add(new TextBlock { Text = "هزینه ثابت از فایل Excel وارد نمی‌شود.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 6, 0, 8), TextAlignment = TextAlignment.Right });
+        var details = review.Issues.Select(x => "ردیف " + x.Row + ": " + x.Message).Concat(duplicates.Select(x => "تکراری: " + x)).Take(100);
+        panel.Children.Add(new TextBox { Text = string.Join(Environment.NewLine, details.DefaultIfEmpty("خطایی در بازبینی پیدا نشد.")), IsReadOnly = true, AcceptsReturn = true, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = 280, TextWrapping = TextWrapping.Wrap });
+        var buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(buttons);
+        var confirm = new Button { Content = "افزودن ردیف‌های معتبر", IsEnabled = Products.Count > 0, Style = (Style)FindResource("Primary") }; buttons.Children.Add(confirm); confirm.Click += (_, _) => DialogResult = true;
+        buttons.Children.Add(new Button { Content = "انصراف", IsCancel = true });
     }
 }

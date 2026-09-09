@@ -24,10 +24,35 @@ public sealed record Month
 {
     public string Key { get; init; } = "";
     public decimal FixedCost { get; set; } = 52_000_000m;
+    public List<FixedExpense> FixedExpenses { get; set; } = [];
     public List<Product> Products { get; set; } = [];
     public int Revision { get; set; }
+    public bool IsClosed { get; set; }
+    public List<AuditEntry> Audit { get; set; } = [];
     public int FormulaVersion { get; init; } = 1;
-    public Month CopyTo(string key) => this with { Key = key, Revision = 0, Products = Products.Select(p => p with { Id = Guid.NewGuid().ToString("N") }).ToList() };
+    public Month CopyTo(string key) => this with { Key = key, Revision = 0, IsClosed = false, Products = Products.Select(p => p with { Id = Guid.NewGuid().ToString("N") }).ToList(), FixedExpenses = FixedExpenses.Select(x => x with { Id = Guid.NewGuid().ToString("N") }).ToList(), Audit = [] };
+}
+
+public sealed record FixedExpense
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Title { get; init; } = "";
+    public decimal Amount { get; init; }
+}
+
+public sealed record AuditEntry
+{
+    public DateTime AtUtc { get; init; } = DateTime.UtcNow;
+    public string Action { get; init; } = "";
+}
+
+public sealed record Preferences
+{
+    public bool AutoBackupOnExit { get; init; }
+    public int AutoBackupKeep { get; init; } = 8;
+    public DateTime? LastAutoBackupUtc { get; init; }
+    public DateTime? LastBackupUtc { get; init; }
+    public string? LastBackupPath { get; init; }
 }
 
 public sealed record Result(decimal Purchase, decimal Discount, decimal AfterDiscount, decimal Offer,
@@ -65,6 +90,16 @@ public static class Rules
         if (!ValidMonth(m.Key)) throw new InvalidDataException("ماه باید با قالب شمسی ۱۴۰۵/۰۶ وارد شود.");
         if (m.FormulaVersion != 1) throw new InvalidDataException("نسخه قواعد این پرونده با برنامه سازگار نیست.");
         if (m.FixedCost < 0 || m.FixedCost > 1_000_000_000_000_000m) throw new InvalidDataException("هزینه ثابت خارج از محدوده مجاز است.");
+        if (m.FixedExpenses.Count > 100) throw new InvalidDataException("حداکثر صد ریزهزینه ثابت مجاز است.");
+        var expenseIds = new HashSet<string>();
+        foreach (var item in m.FixedExpenses)
+        {
+            if (string.IsNullOrWhiteSpace(item.Id) || !expenseIds.Add(item.Id)) throw new InvalidDataException("شناسه ریزهزینه ثابت تکراری یا خالی است.");
+            if (string.IsNullOrWhiteSpace(item.Title) || item.Title.Trim().Length > 100) throw new InvalidDataException("عنوان ریزهزینه ثابت نامعتبر است.");
+            if (item.Amount < 0 || item.Amount > 1_000_000_000_000_000m) throw new InvalidDataException("مبلغ ریزهزینه ثابت خارج از محدوده مجاز است.");
+        }
+        if (m.FixedExpenses.Count > 0 && m.FixedExpenses.Sum(x => x.Amount) != m.FixedCost) throw new InvalidDataException("جمع ریزهزینه‌ها باید با هزینه ثابت ماه برابر باشد.");
+        if (m.Audit.Count > 500) throw new InvalidDataException("تاریخچه تغییرات بیش از حد مجاز است.");
         if (m.Products.Count > 10000) throw new InvalidDataException("حداکثر ده هزار کالا در هر ماه مجاز است.");
         var names = new HashSet<string>(); var ids = new HashSet<string>();
         foreach (var p in m.Products)

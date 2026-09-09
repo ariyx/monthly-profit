@@ -1,10 +1,14 @@
 using System.Globalization;
 using System.IO.Compression;
+using System.Security;
 using System.Text;
 using System.Xml;
 using System.Xml.Linq;
 
 namespace Profit.Core;
+
+public sealed record ImportIssue(int Row, string Message);
+public sealed record ImportReview(List<Product> Products, List<ImportIssue> Issues);
 
 // Narrow, dependency-free OOXML transfer. No macros, external links or formula execution.
 public static class ExcelTransfer
@@ -21,6 +25,12 @@ public static class ExcelTransfer
     }
     public static List<Product> Import(string file)
     {
+        var review = Review(file);
+        if (review.Issues.Count > 0) throw new InvalidDataException("هیچ ردیفی وارد نشد.\n" + string.Join("\n", review.Issues.Take(15).Select(x => "ردیف " + x.Row + ": " + x.Message)));
+        Rules.Validate(new Month { Key = "1405/01", Products = review.Products }); return review.Products;
+    }
+    public static ImportReview Review(string file)
+    {
         if (new FileInfo(file).Length > 30_000_000) throw new InvalidDataException("حداکثر حجم اکسل ۳۰ مگابایت است.");
         using var z = ZipFile.OpenRead(file);
         var strings = z.GetEntry("xl/sharedStrings.xml") is null ? [] : Xml(z, "xl/sharedStrings.xml").Descendants(S + "si").Select(x => string.Concat(x.Descendants(S + "t").Select(t => t.Value))).ToArray();
@@ -31,7 +41,7 @@ public static class ExcelTransfer
         if ((string?)relationship.Attribute("TargetMode") == "External") throw new InvalidDataException("پیوند خارجی قابل ورود نیست.");
         var target = (string?)relationship.Attribute("Target") ?? "";
         var path = target.StartsWith('/') ? target.TrimStart('/') : "xl/" + target;
-        var cells = Xml(z, path).Descendants(S + "row").ToList(); if (cells.Count == 0) return [];
+        var cells = Xml(z, path).Descendants(S + "row").ToList(); if (cells.Count == 0) return new([], []);
         Dictionary<string, string> Row(XElement row) => row.Elements(S + "c").ToDictionary(c => new string(((string?)c.Attribute("r") ?? "").TakeWhile(char.IsLetter).ToArray()), c => {
             var type = (string?)c.Attribute("t"); var value = c.Element(S + "v")?.Value ?? "";
             if (type == "e") throw new InvalidDataException("سلول خطادار در اکسل: " + (string?)c.Attribute("r"));
@@ -39,23 +49,22 @@ public static class ExcelTransfer
         });
         var first = Row(cells[0]); var modern = first.GetValueOrDefault("B") == "کالا";
         if (first.GetValueOrDefault("A") != "برند" || (!modern && !(first.GetValueOrDefault("B") ?? "").Contains("قیمت خرید"))) throw new InvalidDataException("قالب ناشناخته است. از خروجی برنامه یا شیت «ورودی برندها» استفاده کنید.");
-        var result = new List<Product>(); var issues = new List<string>();
+        var result = new List<Product>(); var issues = new List<ImportIssue>();
         foreach (var row in cells.Skip(1))
         {
-            var d = Row(row); var brand = d.GetValueOrDefault("A", "");
-            if (string.IsNullOrWhiteSpace(brand) && string.IsNullOrWhiteSpace(d.GetValueOrDefault(modern ? "C" : "B")) && string.IsNullOrWhiteSpace(d.GetValueOrDefault(modern ? "D" : "I"))) continue;
             try
             {
+                var d = Row(row); var brand = d.GetValueOrDefault("A", "");
+                if (string.IsNullOrWhiteSpace(brand) && string.IsNullOrWhiteSpace(d.GetValueOrDefault(modern ? "C" : "B")) && string.IsNullOrWhiteSpace(d.GetValueOrDefault(modern ? "D" : "I"))) continue;
                 decimal Num(string c) => Rules.Number(d.GetValueOrDefault(c, ""));
                 var p = modern ? new Product { Brand = brand, Name = d.GetValueOrDefault("B", ""), Price = Num("C"), Quantity = Num("D"), Discount = Num("E"), Offer = Num("F"), Markup = Num("G"), CreditShare = Num("H"), CashShare = Num("I"), CashDiscount = Num("J") }
                     : new Product { Brand = brand, Name = "کالای واردشده " + (string?)row.Attribute("r"), Price = Num("B"), Quantity = Num("I"), Discount = Num("C"), Offer = Num("D"), Markup = Num("E"), CreditShare = Num("F"), CashShare = Num("G"), CashDiscount = Num("H") };
                 p = Rules.Clean(p); var errors = Rules.Validate(p); if (errors.Count > 0) throw new InvalidDataException(string.Join(" ", errors)); result.Add(p);
             }
-            catch (Exception ex) when (ex is InvalidDataException or FormatException or OverflowException) { issues.Add("ردیف " + (string?)row.Attribute("r") + ": " + ex.Message); }
+            catch (Exception ex) when (ex is InvalidDataException or FormatException or OverflowException or ArgumentException) { issues.Add(new ImportIssue(int.TryParse((string?)row.Attribute("r"), out var rowNumber) ? rowNumber : 0, ex.Message)); }
             if (result.Count + issues.Count > 10000) throw new InvalidDataException("بیش از ده هزار ردیف قابل ورود نیست.");
         }
-        if (issues.Count > 0) throw new InvalidDataException("هیچ ردیفی وارد نشد.\n" + string.Join("\n", issues.Take(15)));
-        Rules.Validate(new Month { Key = "1405/01", Products = result }); return result;
+        return new(result, issues);
     }
     public static void Export(Month month, string file)
     {
@@ -83,6 +92,51 @@ public static class ExcelTransfer
                     })))));
                 }
                 Put("xl/worksheets/sheet1.xml", Sheet(rows, true).ToString()); Put("xl/worksheets/sheet2.xml", Sheet(summary, false).ToString());
+            }
+            File.Move(temp, file, true);
+        }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+    public static void ExportRange(IReadOnlyList<Month> months, string file)
+    {
+        if (months.Count == 0) throw new InvalidDataException("برای خروجی بازه، حداقل یک ماه لازم است.");
+        foreach (var m in months) Rules.Validate(m);
+        var rows = new List<object?[]> { ["ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود"] };
+        foreach (var m in months.OrderBy(x => x.Key)) { var t = Rules.Summarize(m); rows.Add([m.Key, t.Cost, t.Sales, t.Profit, t.FixedCost, t.Net, t.Margin]); }
+        var totals = months.Select(Rules.Summarize).ToList(); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit);
+        var summary = new List<object?[]> { ["عنوان", "مقدار"], ["از ماه", months.Min(x => x.Key)], ["تا ماه", months.Max(x => x.Key)], ["تعداد ماه", months.Count], ["بهای تمام‌شده", totals.Sum(x => x.Cost)], ["فروش کل", sales], ["سود ناخالص", profit], ["هزینه ثابت", totals.Sum(x => x.FixedCost)], ["نتیجه", totals.Sum(x => x.Net)], ["حاشیه سود وزنی", sales == 0 ? null : profit / sales] };
+        WriteSimpleWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه");
+    }
+    static void WriteSimpleWorkbook(string file, List<object?[]> rows, List<object?[]> summary, string firstName, string secondName)
+    {
+        var temp = file + ".tmp-" + Guid.NewGuid().ToString("N");
+        try
+        {
+            using (var z = ZipFile.Open(temp, ZipArchiveMode.Create))
+            {
+                void Put(string name, string text) { using var writer = new StreamWriter(z.CreateEntry(name).Open(), new UTF8Encoding(false)); writer.Write(text); }
+                Put("[Content_Types].xml", "<Types xmlns=\"http://schemas.openxmlformats.org/package/2006/content-types\"><Default Extension=\"rels\" ContentType=\"application/vnd.openxmlformats-package.relationships+xml\"/><Default Extension=\"xml\" ContentType=\"application/xml\"/><Override PartName=\"/xl/workbook.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml\"/><Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/><Override PartName=\"/xl/worksheets/sheet2.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/></Types>");
+                Put("_rels/.rels", "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument\" Target=\"xl/workbook.xml\"/></Relationships>");
+                Put("xl/workbook.xml", $"<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><sheets><sheet name=\"{SecurityElement.Escape(firstName)}\" sheetId=\"1\" r:id=\"rId1\"/><sheet name=\"{SecurityElement.Escape(secondName)}\" sheetId=\"2\" r:id=\"rId2\"/></sheets></workbook>");
+                Put("xl/_rels/workbook.xml.rels", "<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\"><Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet1.xml\"/><Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet\" Target=\"worksheets/sheet2.xml\"/></Relationships>");
+                XElement Sheet(List<object?[]> data)
+                {
+                    var sheetData = new XElement(S + "sheetData");
+                    foreach (var (row, i) in data.Select((row, i) => (row, i)))
+                    {
+                        var xmlRow = new XElement(S + "row", new XAttribute("r", i + 1));
+                        foreach (var (value, j) in row.Select((value, j) => (value, j)))
+                        {
+                            var cell = new XElement(S + "c", new XAttribute("r", Col(j + 1) + (i + 1)));
+                            if (value is decimal or int) cell.Add(new XElement(S + "v", Convert.ToString(value, CultureInfo.InvariantCulture)));
+                            else { cell.Add(new XAttribute("t", "inlineStr")); cell.Add(new XElement(S + "is", new XElement(S + "t", value?.ToString() ?? ""))); }
+                            xmlRow.Add(cell);
+                        }
+                        sheetData.Add(xmlRow);
+                    }
+                    return new XElement(S + "worksheet", new XElement(S + "sheetViews", new XElement(S + "sheetView", new XAttribute("workbookViewId", "0"), new XAttribute("rightToLeft", "1"))), sheetData);
+                }
+                Put("xl/worksheets/sheet1.xml", Sheet(rows).ToString()); Put("xl/worksheets/sheet2.xml", Sheet(summary).ToString());
             }
             File.Move(temp, file, true);
         }

@@ -6,6 +6,7 @@ namespace Profit.Core;
 public sealed class Store
 {
     public string Path { get; }
+    string PreferencesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "preferences.json");
     private SqliteConnection Open(string? path = null, bool readOnly = false)
     {
         var b = new SqliteConnectionStringBuilder { DataSource = path ?? Path, Mode = readOnly ? SqliteOpenMode.ReadOnly : SqliteOpenMode.ReadWriteCreate, Pooling = false };
@@ -35,11 +36,59 @@ public sealed class Store
     {
         Rules.Validate(month); var next = month with { Revision = month.Revision + 1 };
         using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
+        if (month.Revision > 0)
+        {
+            cmd.CommandText = "SELECT data FROM months WHERE key=$key AND revision=$old"; cmd.Parameters.AddWithValue("$key", month.Key); cmd.Parameters.AddWithValue("$old", month.Revision);
+            var saved = cmd.ExecuteScalar() as string;
+            if (saved is null) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید.");
+            var prior = JsonSerializer.Deserialize<Month>(saved, Rules.Json) ?? throw new InvalidDataException("پرونده نامعتبر است.");
+            if (prior.IsClosed && !month.IsClosed) throw new InvalidOperationException("ماه بسته است؛ ابتدا آن را از بخش مدیریت ماه باز کنید.");
+            if (prior.IsClosed && month.IsClosed && JsonSerializer.Serialize(prior, Rules.Json) != JsonSerializer.Serialize(month with { Revision = prior.Revision }, Rules.Json)) throw new InvalidOperationException("ماه بسته است و قابل ویرایش نیست.");
+            cmd.Parameters.Clear();
+        }
         cmd.CommandText = month.Revision == 0 ? "INSERT INTO months(key,revision,data) VALUES($key,$next,$data)" : "UPDATE months SET revision=$next,data=$data WHERE key=$key AND revision=$old";
         cmd.Parameters.AddWithValue("$key", month.Key); cmd.Parameters.AddWithValue("$next", next.Revision); cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(next, Rules.Json));
         if (month.Revision != 0) cmd.Parameters.AddWithValue("$old", month.Revision);
         if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید.");
         tx.Commit(); month.Revision = next.Revision;
+    }
+    public Month SetClosed(Month month, bool closed)
+    {
+        if (month.IsClosed == closed) return month;
+        var next = month with { IsClosed = closed, Audit = [.. month.Audit.TakeLast(499), new AuditEntry { Action = closed ? "ماه بسته شد" : "ماه باز شد" }] };
+        if (closed) Save(next); else
+        {
+            using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
+            cmd.CommandText = "UPDATE months SET revision=$next,data=$data WHERE key=$key AND revision=$old";
+            next.Revision = month.Revision + 1; cmd.Parameters.AddWithValue("$key", next.Key); cmd.Parameters.AddWithValue("$next", next.Revision); cmd.Parameters.AddWithValue("$old", month.Revision); cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(next, Rules.Json));
+            if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("اطلاعات تغییر کرده است؛ پرونده را دوباره باز کنید."); tx.Commit();
+        }
+        return next;
+    }
+    public Preferences LoadPreferences()
+    {
+        try { return File.Exists(PreferencesPath) ? JsonSerializer.Deserialize<Preferences>(File.ReadAllText(PreferencesPath), Rules.Json) ?? new Preferences() : new Preferences(); }
+        catch { return new Preferences(); }
+    }
+    public void SavePreferences(Preferences settings)
+    {
+        if (settings.AutoBackupKeep is < 1 or > 50) throw new InvalidDataException("تعداد نسخه‌های خودکار باید بین ۱ تا ۵۰ باشد.");
+        var temp = PreferencesPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try { File.WriteAllText(temp, JsonSerializer.Serialize(settings, Rules.Json)); File.Move(temp, PreferencesPath, true); }
+        finally { if (File.Exists(temp)) File.Delete(temp); }
+    }
+    public string CreateAutomaticBackup(int keep)
+    {
+        if (keep is < 1 or > 50) throw new InvalidDataException("تعداد نسخه‌های خودکار باید بین ۱ تا ۵۰ باشد.");
+        var folder = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "backups", "automatic"); Directory.CreateDirectory(folder);
+        var file = System.IO.Path.Combine(folder, "monthly-profit-" + DateTime.Now.ToString("yyyyMMdd-HHmmss-fff") + ".sqlite"); Backup(file);
+        foreach (var old in Directory.GetFiles(folder, "*.sqlite").OrderByDescending(File.GetLastWriteTimeUtc).Skip(keep)) File.Delete(old);
+        return file;
+    }
+    public string? LastAutomaticBackup()
+    {
+        var folder = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "backups", "automatic");
+        return Directory.Exists(folder) ? Directory.GetFiles(folder, "*.sqlite").OrderByDescending(File.GetLastWriteTimeUtc).FirstOrDefault() : null;
     }
     public string CreateSafetyBackup(string operation)
     {
