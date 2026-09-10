@@ -152,10 +152,17 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup();
         var enabled = preferences.AutoBackupOnExit;
-        AutoBackupState.Text = enabled ? "فعال است · هنگام خروج از برنامه یک نسخهٔ امن ذخیره می‌شود." : "غیرفعال است · هنگام خروج نسخهٔ خودکار ساخته نمی‌شود.";
-        AutoBackupState.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray;
+        AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال";
+        AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray;
+        AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246));
+        AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است";
+        AutoBackupState.Foreground = Brushes.SlateGray;
         LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: " + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm");
-        LastManualBackup.Text = preferences.LastBackupUtc == null ? "هنوز یک پشتیبان دستی ایجاد نشده است." : "آخرین پشتیبان دستی: " + preferences.LastBackupUtc.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+        var manualSaved = preferences.LastBackupUtc != null;
+        ManualBackupBadgeText.Text = manualSaved ? "ثبت شده" : "ثبت نشده";
+        ManualBackupBadgeText.Foreground = manualSaved ? Brushes.SeaGreen : Brushes.SlateGray;
+        ManualBackupBadge.Background = manualSaved ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246));
+        LastManualBackup.Text = manualSaved ? "آخرین پشتیبان دستی: " + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
     void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
     void ClearHistoryFilter(object s, RoutedEventArgs e) { loading = true; HistoryFrom.SelectedItem = null; HistoryTo.SelectedItem = null; loading = false; DrawHistory(); }
