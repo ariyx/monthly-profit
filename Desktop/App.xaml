@@ -102,7 +102,7 @@
 </ControlTemplate>
 </ToggleButton.Template>
 </ToggleButton>
-<TextBox x:Name="PART_EditableTextBox" Panel.ZIndex="1" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,34,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="RightToLeft" TextAlignment="Right" IsReadOnly="{TemplateBinding IsReadOnly}"/>
+<TextBox x:Name="PART_EditableTextBox" Panel.ZIndex="1" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,34,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="RightToLeft" TextAlignment="Right" IsReadOnly="{TemplateBinding IsReadOnly}" Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Slide" IsOpen="{TemplateBinding IsDropDownOpen}">
 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Margin="0,4,0,0" Background="White" BorderBrush="#D7DDE7" BorderThickness="1" CornerRadius="8" FlowDirection="RightToLeft">
 <ScrollViewer MaxHeight="260" CanContentScroll="True" Padding="3">
@@ -185,7 +185,7 @@
 <Setter.Value>
 <ControlTemplate TargetType="CheckBox">
 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-<Border x:Name="Indicator" Width="16" Height="16" Background="White" BorderBrush="#98A2B3" BorderThickness="1" CornerRadius="3" Margin="0,0,6,0">
+<Border x:Name="Indicator" Width="17" Height="17" Background="#F8FAFC" BorderBrush="#B8C1D1" BorderThickness="1" CornerRadius="4" Margin="0,0,7,0">
 <Grid>
 <Path x:Name="CheckMark" Data="M 3,8 L 6.5,11.5 L 13,4" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
 </Grid>
@@ -194,11 +194,11 @@
 </StackPanel>
 <ControlTemplate.Triggers>
 <Trigger Property="IsChecked" Value="True">
-<Setter TargetName="Indicator" Property="Background" Value="{StaticResource Accent}"/>
-<Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource Accent}"/>
+<Setter TargetName="Indicator" Property="Background" Value="#475467"/>
+<Setter TargetName="Indicator" Property="BorderBrush" Value="#475467"/>
 <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
 </Trigger>
-<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Indicator" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
+<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Indicator" Property="BorderBrush" Value="#667085"/></Trigger>
 <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
 </ControlTemplate.Triggers>
 </ControlTemplate>
@@ -207,6 +207,9 @@
 </Style>
   <Style x:Key="MutedText" TargetType="TextBlock">
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+<Setter Property="FlowDirection" Value="LeftToRight"/>
+<Setter Property="TextAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
 <Style TargetType="TabItem">
 <Setter Property="FlowDirection" Value="RightToLeft"/>

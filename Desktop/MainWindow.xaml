@@ -45,7 +45,7 @@
 <TabItem Header="داشبورد">
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
-<StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch">
+<StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
 <TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
@@ -96,7 +96,7 @@
 </Grid>
 <Border Style="{StaticResource Panel}">
 <StackPanel>
-<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top">
+<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="LeftToRight">
 <TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}"/>
 <TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
@@ -120,7 +120,7 @@
 <DockPanel Margin="22">
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}">
 <StackPanel>
-<StackPanel HorizontalAlignment="Stretch">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
 <TextBlock Text="کالاهای ماه جاری" Style="{StaticResource PageTitle}"/>
 <TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
@@ -173,11 +173,12 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft">
-<StackPanel HorizontalAlignment="Stretch">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
 <TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
-<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,14,0,0">
+<DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,14,0,0">
+<WrapPanel DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right">
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="9" Padding="8,4" Margin="4">
 <WrapPanel FlowDirection="RightToLeft">
 <TextBlock Text="بازهٔ گزارش:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="5"/>
@@ -195,6 +196,7 @@
 <Button Content="خروجی بازه" Click="ExportRange" Style="{StaticResource Primary}"/>
 </WrapPanel>
 </WrapPanel>
+</DockPanel>
 </StackPanel>
 </Border>
 <Grid Margin="6">
@@ -268,7 +270,7 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel>
-<StackPanel HorizontalAlignment="Stretch">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
 <TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
@@ -276,41 +278,38 @@
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
 <StackPanel>
 <Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Top">
-<Border x:Name="AutoBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
+<StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
+<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
+<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock x:Name="AutoBackupState" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+</StackPanel>
+<Border x:Name="AutoBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="9,0,0,0" VerticalAlignment="Top">
 <TextBlock x:Name="AutoBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
-<StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Right">
-<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock x:Name="AutoBackupState" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Right"/>
-</StackPanel>
 </StackPanel>
 </Grid>
-<TextBlock x:Name="LastAutoBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0"/>
+<TextBlock x:Name="LastAutoBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <CheckBox x:Name="AutoBackup" Content="فعال‌سازی پشتیبان خودکار هنگام خروج" Checked="AutoBackupChanged" Unchecked="AutoBackupChanged" Margin="0,13,0,0"/>
-<TextBlock Text="۸ نسخهٔ خودکار آخر نگه‌داری می‌شود." Style="{StaticResource MutedText}" Margin="0,5,0,0"/>
+<TextBlock Text="۸ نسخهٔ خودکار آخر نگه‌داری می‌شود." Style="{StaticResource MutedText}" Margin="0,5,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6,0,0,0">
 <StackPanel>
 <Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Top">
-<Border x:Name="ManualBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
+<StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
+<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
+<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="ذخیره یا بازیابی نسخهٔ اطلاعات در زمان دلخواه" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+</StackPanel>
+<Border x:Name="ManualBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="9,0,0,0" VerticalAlignment="Top">
 <TextBlock x:Name="ManualBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
-<StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Right">
-<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="ذخیره یا بازیابی نسخهٔ اطلاعات در زمان دلخواه" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Right"/>
-</StackPanel>
 </StackPanel>
 </Grid>
-<TextBlock x:Name="LastManualBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,8"/>
+<TextBlock x:Name="LastManualBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,8" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,14,6,4">
 <Button Content="ذخیره نسخه پشتیبان" Click="Backup" Style="{StaticResource Primary}"/>
 <Button Content="بازیابی پشتیبان" Click="Restore"/>
-<Button Content="بازکردن پوشه اطلاعات" Click="OpenDataFolder"/>
 <Button Content="بازکردن پشتیبان‌ها" Click="OpenBackupFolder"/>
 </WrapPanel>
 </StackPanel>
@@ -326,25 +325,25 @@
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch" Padding="30" MinHeight="174">
-<Grid FlowDirection="LeftToRight" VerticalAlignment="Center">
+<Grid FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="160"/>
-<ColumnDefinition Width="*"/>
+<ColumnDefinition Width="Auto"/>
 </Grid.ColumnDefinitions>
 <Border Grid.Column="0" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Left" VerticalAlignment="Center">
 <Image Source="pack://application:,,,/Assets/webilo-logo.png" Width="100" Height="100" Stretch="Uniform"/>
 </Border>
-<StackPanel Grid.Column="1" Margin="32,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" FlowDirection="RightToLeft">
-<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft"/>
-<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
-<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
+<StackPanel Grid.Column="1" Margin="32,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="LeftToRight">
+<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight"/>
+<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="0,7,0,0"/>
+<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="0,9,0,0"/>
 </StackPanel>
 </Grid>
 </Border>
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
-<StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
-<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,7,0,0"/>
+<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
+<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="LeftToRight" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,7,0,0"/>
 <UniformGrid Columns="3" Margin="0,18,0,0">
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="0,0,5,0">
 <StackPanel>
