@@ -11,7 +11,7 @@ public sealed class ProductDialog : Window
 {
     public Product? Value { get; private set; }
     readonly Dictionary<string, TextBox> fields = [];
-    readonly ComboBox brand = new() { IsEditable = true, IsTextSearchEnabled = true, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right };
+    readonly TextBox brand = new() { FlowDirection = FlowDirection.LeftToRight, TextAlignment = TextAlignment.Right };
     readonly TextBlock error = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 8, 0, 8) };
     readonly TextBlock preview = new() { TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, LineHeight = 27 };
     readonly Product original;
@@ -71,17 +71,10 @@ public sealed class ProductDialog : Window
         }
         string Num(decimal x) => x.ToString("0.########", CultureInfo.InvariantCulture);
 
-        Section("مشخصات کالا", "برند را انتخاب کنید یا نام برند تازه‌ای تایپ کنید.");
+        Section("مشخصات کالا", "نام برند را وارد کنید.");
         var identity = FieldsGrid(2, 2);
         var brandPanel = FieldPanel("برند");
-        var brands = all.Select(x => x.Brand).Append(original.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList();
-        brand.ItemsSource = brands;
-        brand.SelectedItem = brands.FirstOrDefault(x => string.Equals(x, original.Brand, StringComparison.Ordinal));
         brand.Text = original.Brand;
-        brand.SelectionChanged += (_, _) =>
-        {
-            if (brand.SelectedItem is string selected) brand.Text = selected;
-        };
         brandPanel.Children.Add(brand); Place(brandPanel, identity, 0, 0);
         Field(identity, 1, 0, "name", "نام کالا", original.Name); Field(identity, 0, 1, "price", "قیمت خرید واحد — ریال", product == null ? "" : Rules.Money(original.Price)); Field(identity, 1, 1, "quantity", "تعداد / مقدار", Rules.Money(original.Quantity));
 
