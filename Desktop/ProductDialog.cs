@@ -35,7 +35,9 @@ public sealed class ProductDialog : Window
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(26, 19, 26, 18), Child = headerLayout };
         root.Children.Add(header);
 
-        var outer = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(26, 16, 26, 6) }; Grid.SetRow(outer, 1); root.Children.Add(outer);
+        var outer = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(26, 16, 26, 6) };
+        var bodyScroll = new ScrollViewer { FlowDirection = FlowDirection.LeftToRight, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = outer };
+        Grid.SetRow(bodyScroll, 1); root.Children.Add(bodyScroll);
         void Section(string title, string subtitle)
         {
             var section = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 13, 0, 7) };
@@ -71,7 +73,12 @@ public sealed class ProductDialog : Window
 
         Section("مشخصات کالا", "برند را انتخاب کنید یا نام برند تازه‌ای تایپ کنید.");
         var identity = FieldsGrid(2, 2);
-        var brandPanel = FieldPanel("برند"); brand.ItemsSource = all.Select(x => x.Brand).Distinct().OrderBy(x => x).ToList(); brand.Text = original.Brand; brandPanel.Children.Add(brand); Place(brandPanel, identity, 0, 0);
+        var brandPanel = FieldPanel("برند");
+        var brands = all.Select(x => x.Brand).Append(original.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().OrderBy(x => x).ToList();
+        brand.ItemsSource = brands;
+        brand.SelectedItem = brands.FirstOrDefault(x => string.Equals(x, original.Brand, StringComparison.Ordinal));
+        brand.Text = original.Brand;
+        brandPanel.Children.Add(brand); Place(brandPanel, identity, 0, 0);
         Field(identity, 1, 0, "name", "نام کالا", original.Name); Field(identity, 0, 1, "price", "قیمت خرید واحد — ریال", product == null ? "" : Rules.Money(original.Price)); Field(identity, 1, 1, "quantity", "تعداد / مقدار", Rules.Money(original.Quantity));
 
         Section("شرایط خرید", "تخفیف و آفر از مبلغ اولیهٔ خرید محاسبه می‌شوند.");
@@ -144,13 +151,15 @@ public sealed class FixedExpensesDialog : Window
         root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), Child = headerLayout });
 
         var body = new Grid { Margin = new Thickness(26, 20, 26, 24), FlowDirection = FlowDirection.RightToLeft };
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
         var columnLabels = new Grid { FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(4, 0, 4, 5) };
         columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var titleLabel = new TextBlock { Text = "عنوان هزینه", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
         var amountLabel = new TextBlock { Text = "مبلغ — ریال", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
         Grid.SetColumn(amountLabel, 1); Grid.SetColumn(titleLabel, 2); columnLabels.Children.Add(titleLabel); columnLabels.Children.Add(amountLabel); body.Children.Add(columnLabels);
-        list.HorizontalAlignment = HorizontalAlignment.Stretch; Grid.SetRow(list, 1); body.Children.Add(list);
+        list.HorizontalAlignment = HorizontalAlignment.Stretch;
+        var listScroll = new ScrollViewer { FlowDirection = FlowDirection.LeftToRight, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Content = list };
+        Grid.SetRow(listScroll, 1); body.Children.Add(listScroll);
         void Add(FixedExpense? item = null)
         {
             var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.LeftToRight }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });

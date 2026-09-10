@@ -102,7 +102,7 @@
 </ControlTemplate>
 </ToggleButton.Template>
 </ToggleButton>
-<TextBox x:Name="PART_EditableTextBox" Panel.ZIndex="1" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,34,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="RightToLeft" TextAlignment="Right" Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+<TextBox x:Name="PART_EditableTextBox" Panel.ZIndex="1" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,34,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="RightToLeft" TextAlignment="Right" IsReadOnly="{TemplateBinding IsReadOnly}"/>
 <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Slide" IsOpen="{TemplateBinding IsDropDownOpen}">
 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Margin="0,4,0,0" Background="White" BorderBrush="#D7DDE7" BorderThickness="1" CornerRadius="8" FlowDirection="RightToLeft">
 <ScrollViewer MaxHeight="260" CanContentScroll="True" Padding="3">
@@ -162,7 +162,7 @@
 <Setter Property="Foreground" Value="{StaticResource Ink}"/>
 <Setter Property="FlowDirection" Value="LeftToRight"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
   <Style x:Key="PageTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
 <Setter Property="FontSize" Value="20"/>
@@ -285,13 +285,13 @@
 </Style>
   <Style x:Key="TableText" TargetType="TextBlock">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
-<Setter Property="TextAlignment" Value="Right"/>
+<Setter Property="TextAlignment" Value="Center"/>
 <Setter Property="HorizontalAlignment" Value="Stretch"/>
 <Setter Property="VerticalAlignment" Value="Center"/>
 </Style>
   <Style x:Key="TableNumber" TargetType="TextBlock">
 <Setter Property="FlowDirection" Value="LeftToRight"/>
-<Setter Property="TextAlignment" Value="Right"/>
+<Setter Property="TextAlignment" Value="Center"/>
 <Setter Property="HorizontalAlignment" Value="Stretch"/>
 <Setter Property="VerticalAlignment" Value="Center"/>
 </Style>
@@ -302,9 +302,9 @@
 <Setter Property="VerticalAlignment" Value="Center"/>
 </Style>
   <Style TargetType="DataGridColumnHeader">
-<Setter Property="FlowDirection" Value="RightToLeft"/>
-<Setter Property="HorizontalContentAlignment" Value="Right"/>
-<Setter Property="TextBlock.TextAlignment" Value="Right"/>
+<Setter Property="FlowDirection" Value="LeftToRight"/>
+<Setter Property="HorizontalContentAlignment" Value="Center"/>
+<Setter Property="TextBlock.TextAlignment" Value="Center"/>
 <Setter Property="Background" Value="#F7F8FA"/>
 <Setter Property="Foreground" Value="#475467"/>
 <Setter Property="FontWeight" Value="SemiBold"/>
@@ -313,8 +313,8 @@
 </Style>
   <Style TargetType="DataGridCell">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
-<Setter Property="TextBlock.TextAlignment" Value="Right"/>
-<Setter Property="HorizontalContentAlignment" Value="Right"/>
+<Setter Property="TextBlock.TextAlignment" Value="Center"/>
+<Setter Property="HorizontalContentAlignment" Value="Center"/>
 <Setter Property="BorderThickness" Value="0"/>
 <Setter Property="Padding" Value="10,0"/>
 <Setter Property="VerticalContentAlignment" Value="Center"/>

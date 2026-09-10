@@ -45,13 +45,10 @@
 <TabItem Header="داشبورد">
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
-<Grid Margin="6,0,6,14" FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-<TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
+<StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch">
+<TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}"/>
+<TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
-</Grid>
 <UniformGrid Columns="3">
 <Border Style="{StaticResource MetricCard}">
 <StackPanel>
@@ -99,31 +96,18 @@
 </Grid>
 <Border Style="{StaticResource Panel}">
 <StackPanel>
-<Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top" FlowDirection="RightToLeft">
-<TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
+<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top">
+<TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}"/>
+<TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
-</Grid>
 <DataGrid x:Name="BrandsGrid" MaxHeight="360" HorizontalAlignment="Stretch" Margin="0,8,0,0">
 <DataGrid.Columns>
-<DataGridTextColumn Header="رتبه" Binding="{Binding Rank}" Width="0.55*">
-<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
-<DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.45*"/>
-<DataGridTextColumn Header="تعداد کالا" Binding="{Binding Count}" Width="0.85*">
-<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
-<DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.35*">
-<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
-<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.35*">
-<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
-<DataGridTextColumn Header="حاشیه سود" Binding="{Binding MarginText}" Width="0.85*">
-<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Center"/></Style></DataGridTextColumn.ElementStyle>
-</DataGridTextColumn>
+<DataGridTextColumn Header="رتبه" Binding="{Binding Rank}" Width="0.55*" ElementStyle="{StaticResource TableCenter}"/>
+<DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.45*" ElementStyle="{StaticResource TableText}"/>
+<DataGridTextColumn Header="تعداد کالا" Binding="{Binding Count}" Width="0.85*" ElementStyle="{StaticResource TableCenter}"/>
+<DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="حاشیه سود" Binding="{Binding MarginText}" Width="0.85*" ElementStyle="{StaticResource TableNumber}"/>
 </DataGrid.Columns>
 </DataGrid>
 </StackPanel>
@@ -136,14 +120,12 @@
 <DockPanel Margin="22">
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}">
 <StackPanel>
-<Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-<TextBlock Text="کالاهای ماه جاری" Style="{StaticResource PageTitle}" HorizontalAlignment="Right"/>
-<TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
+<StackPanel HorizontalAlignment="Stretch">
+<TextBlock Text="کالاهای ماه جاری" Style="{StaticResource PageTitle}"/>
+<TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
-</Grid>
-<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,12,0,0">
+<DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,12,0,0">
+<WrapPanel DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right">
 <TextBlock Text="جست‌وجو:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="6,0,2,0"/>
 <TextBox x:Name="ProductSearch" Width="240" Margin="4" ToolTip="جست‌وجوی نام کالا یا برند" TextChanged="ProductFilterChanged"/>
 <ComboBox x:Name="BrandFilter" Width="160" SelectionChanged="ProductFilterChanged"/>
@@ -154,6 +136,7 @@
 <Button x:Name="DeleteProductButton" Content="حذف" Click="DeleteProduct" IsEnabled="False"/>
 <Button x:Name="UndoDeleteButton" Content="بازگردانی حذف" Click="UndoDelete" IsEnabled="False"/>
 </WrapPanel>
+</DockPanel>
 </StackPanel>
 </Border>
 <Border DockPanel.Dock="Bottom" Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="13">
@@ -190,13 +173,10 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft">
-<Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-<TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+<StackPanel HorizontalAlignment="Stretch">
+<TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}"/>
+<TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
-</Grid>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,14,0,0">
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="9" Padding="8,4" Margin="4">
 <WrapPanel FlowDirection="RightToLeft">
@@ -288,13 +268,10 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel>
-<Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" HorizontalAlignment="Right" FlowDirection="RightToLeft">
-<TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+<StackPanel HorizontalAlignment="Stretch">
+<TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}"/>
+<TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
-</Grid>
 <UniformGrid Columns="2" Margin="0,16,0,0">
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
 <StackPanel>
@@ -357,10 +334,10 @@
 <Border Grid.Column="0" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Left" VerticalAlignment="Center">
 <Image Source="pack://application:,,,/Assets/webilo-logo.png" Width="100" Height="100" Stretch="Uniform"/>
 </Border>
-<StackPanel Grid.Column="1" Margin="32,0,0,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft">
-<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft"/>
-<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
-<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
+<StackPanel Grid.Column="1" Margin="32,0,0,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" FlowDirection="RightToLeft">
+<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft"/>
+<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
+<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
 </StackPanel>
 </Grid>
 </Border>
