@@ -46,7 +46,7 @@
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Grid Margin="6,0,6,14" FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<StackPanel HorizontalAlignment="Right" FlowDirection="RightToLeft">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}" TextAlignment="Right"/>
 <TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right"/>
 </StackPanel>
@@ -55,21 +55,21 @@
 <Border Style="{StaticResource MetricCard}">
 <StackPanel>
 <TextBlock Text="فروش کل" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Sales" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5"/>
+<TextBlock x:Name="Sales" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right"/>
 <TextBlock Text="فروش نقدی و چکی" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
 <Border Style="{StaticResource MetricCard}">
 <StackPanel>
 <TextBlock Text="سود پیش از هزینه ثابت" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Profit" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5"/>
+<TextBlock x:Name="Profit" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right"/>
 <TextBlock x:Name="MarginLabel" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
 <Border Style="{StaticResource MetricCard}">
 <StackPanel>
 <TextBlock Text="نتیجه پس از هزینه ثابت" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Net" FontSize="27" FontWeight="SemiBold" Margin="0,13,0,5"/>
+<TextBlock x:Name="Net" FontSize="27" FontWeight="SemiBold" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right"/>
 <TextBlock x:Name="NetLabel" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
@@ -99,7 +99,7 @@
 <Border Style="{StaticResource Panel}">
 <StackPanel>
 <Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<StackPanel HorizontalAlignment="Right" VerticalAlignment="Top" FlowDirection="RightToLeft">
+<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="RightToLeft">
 <TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}" TextAlignment="Right"/>
 <TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right"/>
 </StackPanel>
@@ -139,14 +139,15 @@
 <TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}"/>
 </StackPanel>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,12,0,0">
+<TextBlock Text="جست‌وجو:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="6,0,2,0"/>
 <TextBox x:Name="ProductSearch" Width="240" Margin="4" ToolTip="جست‌وجوی نام کالا یا برند" TextChanged="ProductFilterChanged"/>
 <ComboBox x:Name="BrandFilter" Width="160" SelectionChanged="ProductFilterChanged"/>
 <Button Content="پاک کردن جست‌وجو" Click="ClearProductFilter"/>
 <Border Width="1" Height="30" Background="#E4E8EF" Margin="10,0" VerticalAlignment="Center"/>
 <Button Content="+ افزودن کالا" Click="AddProduct" Style="{StaticResource Primary}"/>
-<Button Content="ویرایش" Click="EditProduct"/>
-<Button Content="حذف" Click="DeleteProduct"/>
-<Button Content="بازگردانی حذف" Click="UndoDelete"/>
+<Button x:Name="EditProductButton" Content="ویرایش" Click="EditProduct" IsEnabled="False"/>
+<Button x:Name="DeleteProductButton" Content="حذف" Click="DeleteProduct" IsEnabled="False"/>
+<Button x:Name="UndoDeleteButton" Content="بازگردانی حذف" Click="UndoDelete" IsEnabled="False"/>
 </WrapPanel>
 </StackPanel>
 </Border>
@@ -157,7 +158,7 @@
 </WrapPanel>
 </Border>
 <Grid>
-<DataGrid x:Name="ItemsGrid" MouseDoubleClick="EditProduct">
+<DataGrid x:Name="ItemsGrid" MouseDoubleClick="EditProduct" SelectionChanged="ItemsSelectionChanged">
 <DataGrid.Columns>
 <DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="130"/>
 <DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="170"/>
@@ -171,9 +172,9 @@
 </DataGrid>
 <Border x:Name="ItemsEmpty" Visibility="Collapsed" Background="White">
 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320">
-<TextBlock Text="هنوز کالایی برای نمایش نیست" FontSize="18" FontWeight="SemiBold" TextAlignment="Center"/>
+<TextBlock Text="هنوز کالایی برای نمایش نیست" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Center"/>
 <TextBlock Text="برای شروع، اولین کالا را در همین ماه ثبت کنید." Style="{StaticResource MutedText}" TextWrapping="Wrap" TextAlignment="Center"/>
-<Button Content="+ افزودن کالا" Click="AddProduct" Style="{StaticResource Primary}"/>
+<Button Content="+ افزودن کالا" Click="AddProduct" Style="{StaticResource Primary}" HorizontalAlignment="Center" MinWidth="170"/>
 </StackPanel>
 </Border>
 </Grid>
@@ -185,7 +186,7 @@
 <Border Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft">
 <Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<StackPanel HorizontalAlignment="Right" FlowDirection="RightToLeft">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
 <TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
 </StackPanel>
@@ -219,19 +220,19 @@
 <Border Grid.Column="0" Style="{StaticResource Panel}">
 <StackPanel>
 <TextBlock Text="فروش بازه" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="RangeSales" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Ink}"/>
+<TextBlock x:Name="RangeSales" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Ink}" FlowDirection="LeftToRight" TextAlignment="Right"/>
 </StackPanel>
 </Border>
 <Border Grid.Column="1" Style="{StaticResource Panel}">
 <StackPanel>
 <TextBlock Text="سود ناخالص بازه" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="RangeProfit" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Ink}"/>
+<TextBlock x:Name="RangeProfit" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Ink}" FlowDirection="LeftToRight" TextAlignment="Right"/>
 </StackPanel>
 </Border>
 <Border Grid.Column="2" Style="{StaticResource Panel}">
 <StackPanel>
 <TextBlock x:Name="RangeOutcome" Text="نتیجه نهایی" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="RangeNet" FontSize="20" FontWeight="SemiBold"/>
+<TextBlock x:Name="RangeNet" FontSize="20" FontWeight="SemiBold" FlowDirection="LeftToRight" TextAlignment="Right"/>
 </StackPanel>
 </Border>
 </Grid>
@@ -239,15 +240,21 @@
 <StackPanel>
 <TextBlock x:Name="HistorySummary" Visibility="Collapsed" Text="همه ماه‌های ثبت‌شده" TextWrapping="Wrap"/>
 <Grid Height="270">
-<Canvas x:Name="TrendCanvas" SizeChanged="TrendSizeChanged" Background="#FAFBFD" Margin="0,0,0,8" ClipToBounds="True"/>
+<Canvas x:Name="TrendCanvas" SizeChanged="TrendSizeChanged" Background="#FAFBFD" Margin="0,0,0,8" ClipToBounds="True" FlowDirection="LeftToRight"/>
 <TextBlock x:Name="TrendEmpty" Visibility="Collapsed" Text="برای نمایش روند حداقل دو ماه لازم است." HorizontalAlignment="Center" VerticalAlignment="Center"/>
 </Grid>
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="0,1,0,0" Padding="8,9" Margin="0,4,0,0">
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right">
 <TextBlock Text="نمایش در نمودار:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="8,0,12,0"/>
-<CheckBox x:Name="TrendSales" Content="فروش کل" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0"/>
-<CheckBox x:Name="TrendProfit" Content="سود ناخالص" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0"/>
-<CheckBox x:Name="TrendNet" Content="نتیجه نهایی" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0"/>
+<CheckBox x:Name="TrendSales" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0" ToolTip="نمایش فروش کل">
+<StackPanel Orientation="Horizontal"><Ellipse Width="9" Height="9" Fill="#4688C2" Margin="0,0,5,0"/><TextBlock Text="فروش کل"/></StackPanel>
+</CheckBox>
+<CheckBox x:Name="TrendProfit" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0" ToolTip="نمایش سود ناخالص">
+<StackPanel Orientation="Horizontal"><Ellipse Width="9" Height="9" Fill="#2E8B57" Margin="0,0,5,0"/><TextBlock Text="سود ناخالص"/></StackPanel>
+</CheckBox>
+<CheckBox x:Name="TrendNet" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" VerticalAlignment="Center" Margin="8,0" ToolTip="نمایش نتیجه نهایی">
+<StackPanel Orientation="Horizontal"><Ellipse Width="9" Height="9" Fill="#B42318" Margin="0,0,5,0"/><TextBlock Text="نتیجه نهایی"/></StackPanel>
+</CheckBox>
 </WrapPanel>
 </Border>
 </StackPanel>
@@ -260,7 +267,9 @@
 <DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="145"/>
 <DataGridTextColumn Header="هزینه ثابت" Binding="{Binding FixedText}" Width="145"/>
 <DataGridTextColumn Header="وضعیت" Binding="{Binding OutcomeText}" Width="90"/>
-<DataGridTextColumn Header="نتیجه ماه" Binding="{Binding NetText}" Width="145"/>
+<DataGridTextColumn Header="نتیجه ماه" Binding="{Binding NetText}" Width="145">
+<DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="FlowDirection" Value="LeftToRight"/><Setter Property="TextAlignment" Value="Right"/></Style></DataGridTextColumn.ElementStyle>
+</DataGridTextColumn>
 </DataGrid.Columns>
 </DataGrid>
 </StackPanel>
@@ -273,7 +282,7 @@
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel>
 <Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<StackPanel HorizontalAlignment="Right" FlowDirection="RightToLeft">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
 <TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
 </StackPanel>
@@ -352,7 +361,7 @@
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel>
 <Grid HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<StackPanel HorizontalAlignment="Right" FlowDirection="RightToLeft">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="سامانه مدیریت سود ماهانه" Style="{StaticResource PageTitle}" TextAlignment="Right" HorizontalAlignment="Right"/>
 <TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,7,0,0"/>
 </StackPanel>

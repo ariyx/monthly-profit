@@ -122,7 +122,15 @@ public partial class MainWindow : Window
         var brands = current.Products.Select(x => x.Brand).Distinct().OrderBy(x => x).ToList(); var keep = BrandFilter.SelectedItem as string;
         loading = true; BrandFilter.ItemsSource = new[] { "همه برندها" }.Concat(brands).ToList(); BrandFilter.SelectedItem = brands.Contains(keep ?? "") ? keep : "همه برندها"; loading = false;
         var term = Rules.Normalize(ProductSearch.Text); var brand = BrandFilter.SelectedItem as string; var rows = current.Products.Where(p => (brand == "همه برندها" || brand == null || p.Brand == brand) && (string.IsNullOrWhiteSpace(term) || Rules.Normalize(p.Brand).Contains(term) || Rules.Normalize(p.Name).Contains(term))).Select(p => new ProductRow(p)).ToList();
-        ItemsGrid.ItemsSource = rows; ItemsEmpty.Visibility = current.Products.Count == 0 ? Visibility.Visible : Visibility.Collapsed; ProductCount.Text = rows.Count == current.Products.Count ? $"{rows.Count} کالا در ماه فعال" : $"{rows.Count} کالا از {current.Products.Count} کالا";
+        ItemsGrid.ItemsSource = rows; ItemsEmpty.Visibility = current.Products.Count == 0 ? Visibility.Visible : Visibility.Collapsed; ProductCount.Text = rows.Count == current.Products.Count ? $"{rows.Count} کالا در ماه فعال" : $"{rows.Count} کالا از {current.Products.Count} کالا"; UpdateProductActions();
+    }
+    void ItemsSelectionChanged(object s, SelectionChangedEventArgs e) => UpdateProductActions();
+    void UpdateProductActions()
+    {
+        var selected = ItemsGrid.SelectedItem is ProductRow;
+        EditProductButton.IsEnabled = selected && CanEdit();
+        DeleteProductButton.IsEnabled = selected && CanEdit();
+        UndoDeleteButton.IsEnabled = deleted != null && CanEdit();
     }
     void DrawBrands()
     {
@@ -157,12 +165,12 @@ public partial class MainWindow : Window
         AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246));
         AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است";
         AutoBackupState.Foreground = Brushes.SlateGray;
-        LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: " + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm");
+        LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm");
         var manualSaved = preferences.LastBackupUtc != null;
         ManualBackupBadgeText.Text = manualSaved ? "ثبت شده" : "ثبت نشده";
         ManualBackupBadgeText.Foreground = manualSaved ? Brushes.SeaGreen : Brushes.SlateGray;
         ManualBackupBadge.Background = manualSaved ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246));
-        LastManualBackup.Text = manualSaved ? "آخرین پشتیبان دستی: " + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
+        LastManualBackup.Text = manualSaved ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
     void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
     void ClearHistoryFilter(object s, RoutedEventArgs e) { loading = true; HistoryFrom.SelectedItem = null; HistoryTo.SelectedItem = null; loading = false; DrawHistory(); }
