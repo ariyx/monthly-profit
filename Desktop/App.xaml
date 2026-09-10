@@ -96,10 +96,10 @@
 <Trigger Property="IsMouseOver" Value="True">
 <Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
 </Trigger>
-<Trigger Property="IsEditable" Value="True">
+<DataTrigger Binding="{Binding IsEditable, RelativeSource={RelativeSource AncestorType={x:Type ComboBox}}}" Value="True">
 <Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
 <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
-</Trigger>
+</DataTrigger>
 </ControlTemplate.Triggers>
 </ControlTemplate>
 </ToggleButton.Template>
