@@ -136,7 +136,7 @@
 <StackPanel>
 <StackPanel>
 <TextBlock Text="کالاهای ماه جاری" Style="{StaticResource PageTitle}"/>
-<TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}"/>
+<TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
 </StackPanel>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,12,0,0">
 <TextBlock Text="جست‌وجو:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="6,0,2,0"/>

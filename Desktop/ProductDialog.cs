@@ -22,7 +22,7 @@ public sealed class ProductDialog : Window
     {
         original = product ?? new Product(); others = all;
         Title = product == null ? "افزودن کالا" : "ویرایش کالا";
-        Width = 940; Height = 760; MinWidth = 760; MinHeight = 620; MaxWidth = 1000; MaxHeight = 860; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 940; Height = 780; MinWidth = 760; MinHeight = 720; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
 
         var root = new Grid { FlowDirection = FlowDirection.RightToLeft };
@@ -35,8 +35,7 @@ public sealed class ProductDialog : Window
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(26, 19, 26, 18), Child = headerLayout };
         root.Children.Add(header);
 
-        var outer = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
-        var scroll = new ScrollViewer { Content = outer, Margin = new Thickness(26, 16, 26, 6), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var outer = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(26, 16, 26, 6) }; Grid.SetRow(outer, 1); root.Children.Add(outer);
         void Section(string title, string subtitle)
         {
             var section = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 13, 0, 7) };
@@ -134,7 +133,7 @@ public sealed class FixedExpensesDialog : Window
     public List<FixedExpense>? Value { get; private set; }
     public FixedExpensesDialog(Month month)
     {
-        Title = "ریز هزینه‌های ثابت"; Width = 900; Height = 450; MinWidth = 760; MinHeight = 410; MaxWidth = 980; MaxHeight = 680; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "ریز هزینه‌های ثابت"; Width = 900; Height = 480; MinWidth = 760; MinHeight = 410; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid { FlowDirection = FlowDirection.RightToLeft }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
         var headerLayout = new Grid { FlowDirection = FlowDirection.LeftToRight };
@@ -145,14 +144,13 @@ public sealed class FixedExpensesDialog : Window
         root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), Child = headerLayout });
 
         var body = new Grid { Margin = new Thickness(26, 20, 26, 24), FlowDirection = FlowDirection.RightToLeft };
-        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
         var columnLabels = new Grid { FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(4, 0, 4, 5) };
         columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var titleLabel = new TextBlock { Text = "عنوان هزینه", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
         var amountLabel = new TextBlock { Text = "مبلغ — ریال", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
         Grid.SetColumn(amountLabel, 1); Grid.SetColumn(titleLabel, 2); columnLabels.Children.Add(titleLabel); columnLabels.Children.Add(amountLabel); body.Children.Add(columnLabels);
-        list.HorizontalAlignment = HorizontalAlignment.Stretch;
-        var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch }; Grid.SetRow(scroll, 1); body.Children.Add(scroll);
+        list.HorizontalAlignment = HorizontalAlignment.Stretch; Grid.SetRow(list, 1); body.Children.Add(list);
         void Add(FixedExpense? item = null)
         {
             var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.LeftToRight }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
