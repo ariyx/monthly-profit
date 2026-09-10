@@ -63,8 +63,6 @@ public partial class MainWindow : Window
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.Firebrick : Brushes.SeaGreen;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin); Fixed.Text = Rules.Money(current.FixedCost);
         Breakdown.Text = $"بهای تمام‌شده خرید: {Rules.Money(t.Cost)} ریال\nفروش نقدی: {Rules.Money(t.Cash)} ریال\nفروش چکی: {Rules.Money(t.Credit)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}";
-        FixedHint.Text = t.Net < 0 ? "کسری: " + Rules.Money(-t.Net) + " ریال" : t.Net > 0 ? "هزینه ثابت پوشش داده شده است." : "سر‌به‌سر";
-        NetNoticeTitle.Text = Outcome(t.Net); NetNoticeTitle.Foreground = color; NetNoticeText.Text = t.Net < 0 ? "برای پوشش هزینه ثابت این ماه، " + Rules.Money(-t.Net) + " ریال کسری دارید." : t.Net > 0 ? "پس از هزینه ثابت، " + Rules.Money(t.Net) + " ریال سود باقی مانده است." : "فروش و هزینه ثابت ماه دقیقاً برابر شده‌اند.";
         DrawItems(); DrawBrands(); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · نسخه پرونده {current.Revision}";
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
@@ -150,7 +148,15 @@ public partial class MainWindow : Window
     void OpenDataFolder(object s, RoutedEventArgs e) => Guard(() => Process.Start(new ProcessStartInfo { FileName = DataDirectory, UseShellExecute = true }));
     void OpenBackupFolder(object s, RoutedEventArgs e) => Guard(() => { var p = Path.Combine(DataDirectory, "backups"); Directory.CreateDirectory(p); Process.Start(new ProcessStartInfo { FileName = p, UseShellExecute = true }); });
     void AutoBackupChanged(object s, RoutedEventArgs e) { if (loading) return; Guard(() => { preferences = preferences with { AutoBackupOnExit = AutoBackup.IsChecked == true }; store.SavePreferences(preferences); DrawBackupStatus(); }); }
-    void DrawBackupStatus() { var auto = store.LastAutomaticBackup(); var manual = preferences.LastBackupPath; LastBackup.Text = manual != null && preferences.LastBackupUtc != null ? "آخرین پشتیبان: " + preferences.LastBackupUtc.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") + " · " + manual : auto == null ? "هنوز پشتیبانی ثبت نشده است." : "آخرین پشتیبان خودکار: " + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm") + " · " + auto; }
+    void DrawBackupStatus()
+    {
+        var auto = store.LastAutomaticBackup();
+        var enabled = preferences.AutoBackupOnExit;
+        AutoBackupState.Text = enabled ? "فعال است · هنگام خروج از برنامه یک نسخهٔ امن ذخیره می‌شود." : "غیرفعال است · هنگام خروج نسخهٔ خودکار ساخته نمی‌شود.";
+        AutoBackupState.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray;
+        LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: " + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm");
+        LastManualBackup.Text = preferences.LastBackupUtc == null ? "هنوز یک پشتیبان دستی ایجاد نشده است." : "آخرین پشتیبان دستی: " + preferences.LastBackupUtc.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
+    }
     void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
     void ClearHistoryFilter(object s, RoutedEventArgs e) { loading = true; HistoryFrom.SelectedItem = null; HistoryTo.SelectedItem = null; loading = false; DrawHistory(); }
     void DrawHistory()

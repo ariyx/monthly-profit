@@ -127,18 +127,18 @@ public sealed class FixedExpensesDialog : Window
     public List<FixedExpense>? Value { get; private set; }
     public FixedExpensesDialog(Month month)
     {
-        Title = "ریز هزینه‌های ثابت"; Width = 620; Height = 570; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "ریز هزینه‌های ثابت"; Width = 680; Height = 520; MinWidth = 600; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
-        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(22, 17, 22, 15), Child = new StackPanel { Children = { new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right }, new TextBlock { Text = "جمع ردیف‌ها، هزینه ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 5, 0, 0) } } } });
+        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), FlowDirection = FlowDirection.RightToLeft, Child = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, Children = { new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right }, new TextBlock { Text = "جمع ردیف‌ها، هزینه ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 7, 0, 0), TextAlignment = TextAlignment.Right } } } });
         var body = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(body, 1); root.Children.Add(body);
         var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 350 }; body.Children.Add(scroll);
         void Add(FixedExpense? item = null)
         {
-            var row = new Grid { Margin = new Thickness(0, 3, 0, 3) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(170) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه" };
-            var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال" }; MoneyInput.Attach(amount);
-            var remove = new Button { Content = "حذف", Margin = new Thickness(4) };
+            var row = new Grid { Margin = new Thickness(0, 4, 0, 4) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(82) });
+            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14 };
+            var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال", FontSize = 14 }; MoneyInput.Attach(amount);
+            var remove = new Button { Content = "حذف", Margin = new Thickness(4), Padding = new Thickness(8, 8, 8, 8) };
             Grid.SetColumn(title, 0); Grid.SetColumn(amount, 1); Grid.SetColumn(remove, 2); row.Children.Add(title); row.Children.Add(amount); row.Children.Add(remove); list.Children.Add(row); rows.Add((title, amount));
             remove.Click += (_, _) => { list.Children.Remove(row); rows.RemoveAll(x => ReferenceEquals(x.Title, title)); };
         }

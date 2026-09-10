@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="../Core/Profit.Core.csproj" />
     <Resource Include="Assets\company-logo-cropped.png" />
+    <Resource Include="Assets\webilo-logo.png" />
     <Resource Include="Assets\Fonts\Vazirmatn-Regular.ttf" />
     <Resource Include="Assets\Fonts\Vazirmatn-SemiBold.ttf" />
   </ItemGroup>
