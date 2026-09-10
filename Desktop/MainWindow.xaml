@@ -277,17 +277,15 @@
 <UniformGrid Columns="2" Margin="0,16,0,0">
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
 <StackPanel>
-<Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
+<StackPanel FlowDirection="LeftToRight">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
-<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-<TextBlock x:Name="AutoBackupState" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-</StackPanel>
-<Border x:Name="AutoBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="9,0,0,0" VerticalAlignment="Top">
+<Border x:Name="AutoBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
 <TextBlock x:Name="AutoBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
+<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" VerticalAlignment="Center"/>
 </StackPanel>
-</Grid>
+<TextBlock x:Name="AutoBackupState" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+</StackPanel>
 <TextBlock x:Name="LastAutoBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <CheckBox x:Name="AutoBackup" Content="فعال‌سازی پشتیبان خودکار هنگام خروج" Checked="AutoBackupChanged" Unchecked="AutoBackupChanged" Margin="0,13,0,0"/>
 <TextBlock Text="۸ نسخهٔ خودکار آخر نگه‌داری می‌شود." Style="{StaticResource MutedText}" Margin="0,5,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
@@ -295,17 +293,15 @@
 </Border>
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6,0,0,0">
 <StackPanel>
-<Grid FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
+<StackPanel FlowDirection="LeftToRight">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
-<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-<TextBlock Text="ذخیره یا بازیابی نسخهٔ اطلاعات در زمان دلخواه" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-</StackPanel>
-<Border x:Name="ManualBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="9,0,0,0" VerticalAlignment="Top">
+<Border x:Name="ManualBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
 <TextBlock x:Name="ManualBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
+<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" VerticalAlignment="Center"/>
 </StackPanel>
-</Grid>
+<TextBlock Text="ذخیره یا بازیابی نسخهٔ اطلاعات در زمان دلخواه" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+</StackPanel>
 <TextBlock x:Name="LastManualBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,8" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,14,6,4">
 <Button Content="ذخیره نسخه پشتیبان" Click="Backup" Style="{StaticResource Primary}"/>
@@ -325,7 +321,8 @@
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch" Padding="30" MinHeight="174">
-<Grid FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Center">
+<DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+<Grid DockPanel.Dock="Right" FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="160"/>
 <ColumnDefinition Width="Auto"/>
@@ -339,6 +336,7 @@
 <TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="0,9,0,0"/>
 </StackPanel>
 </Grid>
+</DockPanel>
 </Border>
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
@@ -348,19 +346,19 @@
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="0,0,5,0">
 <StackPanel>
 <TextBlock Text="سازمان" Style="{StaticResource MutedText}"/>
-<TextBlock Text="شرکت متحد توزیع ایرانیان" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+<TextBlock Text="شرکت متحد توزیع ایرانیان" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="5,0">
 <StackPanel>
 <TextBlock Text="حریم داده‌ها" Style="{StaticResource MutedText}"/>
-<TextBlock Text="داده‌ها فقط روی همین رایانه ذخیره می‌شوند" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+<TextBlock Text="داده‌ها فقط روی همین رایانه ذخیره می‌شوند" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="5,0,0,0">
 <StackPanel>
 <TextBlock Text="اطلاعات نسخه" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="AboutVersion" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+<TextBlock x:Name="AboutVersion" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 </UniformGrid>

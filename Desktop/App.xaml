@@ -78,31 +78,22 @@
 <Setter.Value>
 <ControlTemplate TargetType="ComboBox">
 <Grid SnapsToDevicePixels="True">
-<ToggleButton x:Name="ToggleButton" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False" ClickMode="Press" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="0" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}">
+<Grid.ColumnDefinitions>
+<ColumnDefinition Width="*"/>
+<ColumnDefinition Width="34"/>
+</Grid.ColumnDefinitions>
+<Border x:Name="ComboBorder" Grid.ColumnSpan="2" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8"/>
+<ContentPresenter x:Name="ContentSite" Grid.Column="0" Margin="12,0,8,0" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft"/>
+<TextBox x:Name="PART_EditableTextBox" Grid.Column="0" Panel.ZIndex="2" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,4,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="LeftToRight" TextAlignment="Right" IsReadOnly="{TemplateBinding IsReadOnly}" Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+<ToggleButton x:Name="ToggleButton" Grid.Column="1" Panel.ZIndex="3" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Focusable="False" ClickMode="Press" Background="Transparent" BorderBrush="Transparent" BorderThickness="0">
 <ToggleButton.Template>
 <ControlTemplate TargetType="ToggleButton">
-<Border x:Name="ComboBorder" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{Binding BorderThickness, RelativeSource={RelativeSource AncestorType=ComboBox}}" CornerRadius="8" Padding="{Binding Padding, RelativeSource={RelativeSource AncestorType=ComboBox}}">
-<Grid>
-<Grid.ColumnDefinitions>
-<ColumnDefinition Width="22"/>
-<ColumnDefinition Width="*"/>
-</Grid.ColumnDefinitions>
+<Border Background="Transparent">
 <Path Data="M 0,0 L 10,0 L 5,6 Z" Fill="#667085" Width="10" Height="6" Stretch="Fill" VerticalAlignment="Center" HorizontalAlignment="Center" SnapsToDevicePixels="True"/>
-<ContentPresenter x:Name="ContentSite" Grid.Column="1" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}" ContentStringFormat="{TemplateBinding ContentStringFormat}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-</Grid>
 </Border>
-<ControlTemplate.Triggers>
-<Trigger Property="IsMouseOver" Value="True">
-<Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource Accent}"/>
-</Trigger>
-<DataTrigger Binding="{Binding IsEditable, RelativeSource={RelativeSource AncestorType={x:Type ComboBox}}}" Value="True">
-<Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
-</DataTrigger>
-</ControlTemplate.Triggers>
 </ControlTemplate>
 </ToggleButton.Template>
 </ToggleButton>
-<TextBox x:Name="PART_EditableTextBox" Panel.ZIndex="1" Visibility="Collapsed" Style="{x:Null}" Background="Transparent" BorderThickness="0" Padding="12,0,34,0" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" FlowDirection="RightToLeft" TextAlignment="Right" IsReadOnly="{TemplateBinding IsReadOnly}" Text="{Binding Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
 <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True" PopupAnimation="Slide" IsOpen="{TemplateBinding IsDropDownOpen}">
 <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}" Margin="0,4,0,0" Background="White" BorderBrush="#D7DDE7" BorderThickness="1" CornerRadius="8" FlowDirection="RightToLeft">
 <ScrollViewer MaxHeight="260" CanContentScroll="True" Padding="3">
@@ -112,8 +103,10 @@
 </Popup>
 </Grid>
 <ControlTemplate.Triggers>
+<Trigger Property="IsMouseOver" Value="True"><Setter TargetName="ComboBorder" Property="BorderBrush" Value="{StaticResource Accent}"/></Trigger>
 <DataTrigger Binding="{Binding IsEditable, RelativeSource={RelativeSource TemplatedParent}}" Value="True">
 <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+<Setter TargetName="ContentSite" Property="Visibility" Value="Collapsed"/>
 </DataTrigger>
 </ControlTemplate.Triggers>
 </ControlTemplate>

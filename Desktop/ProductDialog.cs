@@ -168,7 +168,7 @@ public sealed class FixedExpensesDialog : Window
         void Add(FixedExpense? item = null)
         {
             var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.LeftToRight }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right };
+            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14, FlowDirection = FlowDirection.LeftToRight, TextAlignment = TextAlignment.Right };
             var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال", FontSize = 14, FlowDirection = FlowDirection.LeftToRight, TextAlignment = TextAlignment.Right }; MoneyInput.Attach(amount);
             var remove = new Button { Content = "حذف", Margin = new Thickness(4), Padding = new Thickness(8, 8, 8, 8) };
             Grid.SetColumn(remove, 0); Grid.SetColumn(amount, 1); Grid.SetColumn(title, 2); row.Children.Add(title); row.Children.Add(amount); row.Children.Add(remove); list.Children.Add(row); rows.Add((title, amount));
