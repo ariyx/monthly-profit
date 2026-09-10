@@ -22,27 +22,32 @@ public sealed class ProductDialog : Window
     {
         original = product ?? new Product(); others = all;
         Title = product == null ? "افزودن کالا" : "ویرایش کالا";
-        Width = 820; Height = 780; MinWidth = 660; MinHeight = 590; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 980; Height = 800; MinWidth = 900; MinHeight = 650; MaxWidth = 1100; MaxHeight = 900; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
 
         var root = new Grid { FlowDirection = FlowDirection.RightToLeft };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
-        var headerText = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
+        var headerText = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
         headerText.Children.Add(new TextBlock { Text = Title, FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right });
         headerText.Children.Add(new TextBlock { Text = "اطلاعات و درصدهای این کالا فقط در ماه فعال ثبت می‌شوند.", Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)), Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right });
-        var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(26, 19, 26, 18), Child = headerText };
+        var headerLayout = new Grid { FlowDirection = FlowDirection.LeftToRight };
+        headerLayout.Children.Add(headerText);
+        var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(26, 19, 26, 18), Child = headerLayout };
         root.Children.Add(header);
 
-        var outer = new StackPanel { Margin = new Thickness(26, 22, 26, 26), FlowDirection = FlowDirection.RightToLeft };
-        var scroll = new ScrollViewer { Content = outer, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var outer = new StackPanel { Width = 920, HorizontalAlignment = HorizontalAlignment.Center, FlowDirection = FlowDirection.RightToLeft };
+        var scroll = new ScrollViewer { Content = outer, Margin = new Thickness(26, 22, 26, 26), VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Center, FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
         void Section(string title, string subtitle)
         {
-            outer.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 13, 0, 4), TextAlignment = TextAlignment.Right });
-            outer.Children.Add(new TextBlock { Text = subtitle, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 0, 0, 7), TextAlignment = TextAlignment.Right });
+            var section = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 13, 0, 7) };
+            var text = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
+            text.Children.Add(new TextBlock { Text = title, FontSize = 16, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right });
+            text.Children.Add(new TextBlock { Text = subtitle, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 4, 0, 0), TextAlignment = TextAlignment.Right });
+            section.Children.Add(text); outer.Children.Add(section);
         }
         StackPanel FieldPanel(string label)
         {
-            var panel = new StackPanel { Margin = new Thickness(6), FlowDirection = FlowDirection.RightToLeft };
+            var panel = new StackPanel { Margin = new Thickness(6, 0, 6, 0), FlowDirection = FlowDirection.RightToLeft };
             panel.Children.Add(new TextBlock { Text = label, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(52, 64, 84)), TextAlignment = TextAlignment.Right });
             return panel;
         }
@@ -82,9 +87,10 @@ public sealed class ProductDialog : Window
         var previewTitle = new TextBlock { Text = "پیش‌نمایش محاسبه", FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(143, 32, 32)), Margin = new Thickness(0, 0, 0, 5), TextAlignment = TextAlignment.Right };
         var previewBox = new Border { Background = new SolidColorBrush(Color.FromRgb(255, 248, 248)), BorderBrush = new SolidColorBrush(Color.FromRgb(245, 198, 198)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(15), Margin = new Thickness(0, 8, 0, 0), FlowDirection = FlowDirection.RightToLeft, Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, Children = { previewTitle, preview } } }; outer.Children.Add(previewBox);
         outer.Children.Add(new TextBlock { Text = "اعداد را بدون جداکننده یا با جداکنندهٔ رایج وارد کنید؛ محاسبه هم‌زمان انجام می‌شود.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), Margin = new Thickness(0, 11, 0, 5), TextAlignment = TextAlignment.Right });
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 10, 0, 0) };
+        var buttonsLayout = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 10, 0, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right };
         var save = new Button { Content = "ثبت کالا", Style = (Style)FindResource("Primary"), IsDefault = true }; save.Click += (_, _) => { try { Value = Read(); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
-        buttons.Children.Add(save); buttons.Children.Add(new Button { Content = "انصراف", IsCancel = true }); outer.Children.Add(buttons);
+        buttons.Children.Add(save); buttons.Children.Add(new Button { Content = "انصراف", IsCancel = true }); buttonsLayout.Children.Add(buttons); outer.Children.Add(buttonsLayout);
         initialized = true; if (product != null) Preview();
     }
 
@@ -127,24 +133,38 @@ public sealed class FixedExpensesDialog : Window
     public List<FixedExpense>? Value { get; private set; }
     public FixedExpensesDialog(Month month)
     {
-        Title = "ریز هزینه‌های ثابت"; Width = 680; Height = 520; MinWidth = 600; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "ریز هزینه‌های ثابت"; Width = 900; Height = 560; MinWidth = 780; MinHeight = 470; MaxWidth = 980; MaxHeight = 720; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
-        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), FlowDirection = FlowDirection.RightToLeft, Child = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, Children = { new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right }, new TextBlock { Text = "جمع ردیف‌ها، هزینه ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 7, 0, 0), TextAlignment = TextAlignment.Right } } } });
-        var body = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(body, 1); root.Children.Add(body);
-        var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, MaxHeight = 350 }; body.Children.Add(scroll);
+        var root = new Grid { FlowDirection = FlowDirection.RightToLeft }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
+        var headerLayout = new Grid { FlowDirection = FlowDirection.LeftToRight };
+        var headerText = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
+        headerText.Children.Add(new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right });
+        headerText.Children.Add(new TextBlock { Text = "جمع ردیف‌ها، هزینهٔ ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 7, 0, 0), TextAlignment = TextAlignment.Right });
+        headerLayout.Children.Add(headerText);
+        root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), Child = headerLayout });
+
+        var body = new Grid { Margin = new Thickness(26, 20, 26, 24), FlowDirection = FlowDirection.RightToLeft };
+        body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
+        var columnLabels = new Grid { FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(4, 0, 4, 5) };
+        columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var titleLabel = new TextBlock { Text = "عنوان هزینه", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
+        var amountLabel = new TextBlock { Text = "مبلغ — ریال", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
+        Grid.SetColumn(amountLabel, 1); Grid.SetColumn(titleLabel, 2); columnLabels.Children.Add(titleLabel); columnLabels.Children.Add(amountLabel); body.Children.Add(columnLabels);
+        list.HorizontalAlignment = HorizontalAlignment.Stretch;
+        var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch }; Grid.SetRow(scroll, 1); body.Children.Add(scroll);
         void Add(FixedExpense? item = null)
         {
-            var row = new Grid { Margin = new Thickness(0, 4, 0, 4) }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(82) });
-            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14 };
-            var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال", FontSize = 14 }; MoneyInput.Attach(amount);
+            var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.LeftToRight }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right };
+            var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال", FontSize = 14, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right }; MoneyInput.Attach(amount);
             var remove = new Button { Content = "حذف", Margin = new Thickness(4), Padding = new Thickness(8, 8, 8, 8) };
-            Grid.SetColumn(title, 0); Grid.SetColumn(amount, 1); Grid.SetColumn(remove, 2); row.Children.Add(title); row.Children.Add(amount); row.Children.Add(remove); list.Children.Add(row); rows.Add((title, amount));
+            Grid.SetColumn(remove, 0); Grid.SetColumn(amount, 1); Grid.SetColumn(title, 2); row.Children.Add(title); row.Children.Add(amount); row.Children.Add(remove); list.Children.Add(row); rows.Add((title, amount));
             remove.Click += (_, _) => { list.Children.Remove(row); rows.RemoveAll(x => ReferenceEquals(x.Title, title)); };
         }
         foreach (var item in month.FixedExpenses) Add(item);
         if (rows.Count == 0 && month.FixedCost > 0) Add(new FixedExpense { Title = "هزینه ثابت ماه", Amount = month.FixedCost });
-        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) }; body.Children.Add(actions);
+        var actionsLayout = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 14, 0, 0) }; Grid.SetRow(actionsLayout, 2); body.Children.Add(actionsLayout);
+        var actions = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right }; actionsLayout.Children.Add(actions);
         var add = new Button { Content = "+ افزودن ردیف" }; actions.Children.Add(add); add.Click += (_, _) => Add();
         var save = new Button { Content = "ثبت هزینه‌ها", Style = (Style)FindResource("Primary") }; actions.Children.Add(save);
         save.Click += (_, _) =>
