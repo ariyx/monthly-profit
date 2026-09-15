@@ -33,6 +33,25 @@ try
     var export = Path.Combine(root, "roundtrip.xlsx"); ExcelTransfer.Export(sample, export); var rows = ExcelTransfer.Import(export); Equal(rows.Count, 6, "Excel roundtrip count"); Equal(Rules.Summarize(new Month { Key = sample.Key, Products = rows }).Profit, t.Profit, "Excel precision roundtrip");
     var range = Path.Combine(root, "range.xlsx"); ExcelTransfer.ExportRange([sample, mixed], range); using (var archive = ZipFile.OpenRead(range)) Equal(archive.GetEntry("xl/worksheets/sheet1.xml") is not null, true, "range Excel output");
     var duplicate = sample with { Products = [p, p with { Id = Guid.NewGuid().ToString() }] }; Throws(() => db.Save(duplicate), "duplicate brand-product pair");
+    var brand = new Brand { Name = "Fikores", Markup = .20m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m };
+    var item = new CatalogItem { Code = "1060395", Name = "کالای آزمایشی", Brand = brand.Name };
+    var ledger = new Ledger
+    {
+        Brands = [brand], Items = [item],
+        Purchases = [
+            new Purchase { Id = "p1", Date = "14050301", Code = item.Code, Quantity = 5, UnitPrice = 100, Total = 500 },
+            new Purchase { Id = "p2", Date = "14050401", Code = item.Code, Quantity = 5, UnitPrice = 200, Total = 1000 }
+        ],
+        Sales = [new Sale { Id = "s1", Date = "14050402", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, Deductions = 100, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }]
+    };
+    var calculation = LedgerCalculator.Calculate(ledger); var settlement = calculation.Sales["s1"];
+    Equal(settlement.Cost, 700m, "FIFO cost uses oldest purchase"); Equal(settlement.Cash, 313.5m, "cash discount only reduces cash share"); Equal(settlement.Credit, 770m, "credit share retained"); Equal(settlement.Profit, 383.5m, "ledger profit"); Equal(calculation.Stock.Single().Quantity, 4m, "rolling inventory");
+    var shortage = LedgerCalculator.PreviewSale(ledger, new Sale { Id = "s2", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m });
+    Equal(shortage.Shortage, 2m, "shortage is surfaced for manual reconciliation");
+    var withOpening = new Ledger { Brands = [brand], Items = [item], OpeningLots = [new OpeningLot { Id = "o1", Code = item.Code, Quantity = 3, UnitCost = 80, SourceDate = "14041229" }], Sales = [new Sale { Id = "os1", Date = "14050102", Code = item.Code, Quantity = 2, UnitPrice = 200, Total = 400, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
+    Equal(LedgerCalculator.Calculate(withOpening).Sales["os1"].Cost, 160m, "opening inventory is consumed before 1405 purchases");
+    db.SaveLedger(ledger); Equal(db.LoadLedger().Purchases.Count, 2, "ledger persists"); Equal(db.Keys().Contains("1405/03"), true, "purchase month auto-created"); Equal(db.Keys().Contains("1405/04"), true, "sale month auto-created");
+    var ledgerExport = Path.Combine(root, "ledger.xlsx"); ExcelTransfer.ExportLedgerMonth(ledger, new Month { Key = "1405/04" }, ledgerExport); using (var archive = ZipFile.OpenRead(ledgerExport)) Equal(archive.GetEntry("xl/worksheets/sheet1.xml") is not null, true, "ledger Excel output");
     if (args.Length > 0) { var original = ExcelTransfer.Import(args[0]); Equal(original.Count, 6, "original Excel import"); Equal(Rules.Summarize(new Month { Key = "1405/06", Products = original }).Profit, 8564400m, "original input reconciliation"); }
     Console.WriteLine(JsonSerializer.Serialize(new { status = "passed", checks, sample = t }, Rules.Json));
 }

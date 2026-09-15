@@ -5,6 +5,7 @@ namespace Profit.Core;
 
 public sealed class Store
 {
+    const int SchemaVersion = 2;
     public string Path { get; }
     string PreferencesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "preferences.json");
     private SqliteConnection Open(string? path = null, bool readOnly = false)
@@ -17,8 +18,46 @@ public sealed class Store
         Path = System.IO.Path.GetFullPath(path); Directory.CreateDirectory(System.IO.Path.GetDirectoryName(Path)!);
         using var c = Open(); using var cmd = c.CreateCommand();
         cmd.CommandText = "PRAGMA user_version"; var version = Convert.ToInt32(cmd.ExecuteScalar());
-        if (version > 1) throw new InvalidDataException("بانک اطلاعات متعلق به نسخه جدیدتر برنامه است.");
-        cmd.CommandText = "CREATE TABLE IF NOT EXISTS months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); PRAGMA user_version=1;"; cmd.ExecuteNonQuery();
+        if (version > SchemaVersion) throw new InvalidDataException("بانک اطلاعات متعلق به نسخه جدیدتر برنامه است.");
+        if (version < SchemaVersion)
+        {
+            // داده‌های نسخهٔ اول آزمایشی بودند و مدل آن با گردش واقعی کالا سازگار نیست.
+            cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=2;";
+            cmd.Parameters.AddWithValue("$ledger", JsonSerializer.Serialize(new Ledger(), Rules.Json)); cmd.ExecuteNonQuery();
+        }
+        else
+        {
+            cmd.CommandText = "CREATE TABLE IF NOT EXISTS months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT OR IGNORE INTO app_state(id,data) VALUES(1,$ledger);";
+            cmd.Parameters.AddWithValue("$ledger", JsonSerializer.Serialize(new Ledger(), Rules.Json)); cmd.ExecuteNonQuery();
+        }
+    }
+
+    public Ledger LoadLedger()
+    {
+        using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "SELECT data FROM app_state WHERE id=1";
+        var json = cmd.ExecuteScalar() as string ?? throw new InvalidDataException("دفتر تراکنش‌ها یافت نشد.");
+        var ledger = JsonSerializer.Deserialize<Ledger>(json, Rules.Json) ?? throw new InvalidDataException("دفتر تراکنش‌ها نامعتبر است.");
+        LedgerCalculator.Calculate(ledger); return ledger;
+    }
+    public void SaveLedger(Ledger ledger)
+    {
+        LedgerCalculator.Calculate(ledger);
+        var keys = ledger.Purchases.Select(x => Rules.MonthOf(x.Date)).Concat(ledger.Sales.Select(x => Rules.MonthOf(x.Date))).Distinct().ToList();
+        using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
+        cmd.CommandText = "UPDATE app_state SET data=$data WHERE id=1"; cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(ledger, Rules.Json));
+        if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("ذخیره دفتر تراکنش‌ها انجام نشد.");
+        foreach (var key in keys)
+        {
+            cmd.Parameters.Clear(); cmd.CommandText = "INSERT OR IGNORE INTO months(key,revision,data) VALUES($key,1,$data)";
+            cmd.Parameters.AddWithValue("$key", key); cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(new Month { Key = key }, Rules.Json)); cmd.ExecuteNonQuery();
+        }
+        tx.Commit();
+    }
+    public Month EnsureMonth(string key)
+    {
+        if (!Rules.ValidMonth(key)) throw new InvalidDataException("ماه نامعتبر است.");
+        if (Keys().Contains(key)) return Load(key);
+        var month = new Month { Key = key }; Save(month); return month;
     }
     public List<string> Keys()
     {
@@ -133,9 +172,11 @@ public sealed class Store
         using var c = new SqliteConnection(new SqliteConnectionStringBuilder { DataSource = file, Mode = SqliteOpenMode.ReadOnly, Pooling = false }.ToString()); c.Open();
         using var cmd = c.CreateCommand(); cmd.CommandText = "PRAGMA integrity_check";
         if (!Equals(cmd.ExecuteScalar(), "ok")) throw new InvalidDataException("فایل پشتیبان آسیب دیده است.");
-        cmd.CommandText = "PRAGMA user_version"; if (Convert.ToInt32(cmd.ExecuteScalar()) != 1) throw new InvalidDataException("نسخه پشتیبان سازگار نیست.");
+        cmd.CommandText = "PRAGMA user_version"; if (Convert.ToInt32(cmd.ExecuteScalar()) != SchemaVersion) throw new InvalidDataException("نسخه پشتیبان سازگار نیست.");
         cmd.CommandText = "SELECT key, data FROM months"; using var r = cmd.ExecuteReader();
         while (r.Read()) { var m = JsonSerializer.Deserialize<Month>(r.GetString(1), Rules.Json) ?? throw new InvalidDataException("داده نامعتبر"); Rules.Validate(m); if (m.Key != r.GetString(0)) throw new InvalidDataException("شناسه ماه ناسازگار است."); }
+        r.Close(); cmd.CommandText = "SELECT data FROM app_state WHERE id=1"; var state = cmd.ExecuteScalar() as string ?? throw new InvalidDataException("دفتر تراکنش‌ها موجود نیست.");
+        LedgerCalculator.Calculate(JsonSerializer.Deserialize<Ledger>(state, Rules.Json) ?? throw new InvalidDataException("دفتر تراکنش‌ها نامعتبر است."));
     }
     public string Restore(string source)
     {

@@ -1,41 +1,43 @@
-# Monthly Profit — Windows desktop implementation
+# Monthly Profit — گردش واقعی خرید، فروش و موجودی
 
-Status: source implementation, not an accepted Windows release. No EXE has been built in this conversation.
+پیاده‌سازی C# / WPF / .NET 10 برای ثبت آفلاین خرید، فروش و سود شرکت متحد توزیع ایرانیان. برنامه تراکنش‌ها را با تاریخ شمسی نگه می‌دارد؛ ماه از تاریخ تراکنش استخراج می‌شود و داشبورد فقط نمای ماه انتخاب‌شده است.
 
-C# / WPF / .NET 10, Microsoft.Data.Sqlite 10.0.8, offline single-user per-Windows-account storage. Persian RTL interface. Amounts use `decimal`; rates are fractional decimals in storage. Monthly product snapshots prevent later edits from rewriting history. Optimistic revisions and SQLite transactions protect saves. Backups use SQLite's online backup API and are integrity-checked before restoration; pre-restore copies are retained.
+## قواعد اصلی
 
-The actual input workbook remains the source of the six-row reference dataset. Item names in sample/imported legacy data are explicitly placeholders, since the original workbook identifies only brands.
+- هویت کالا: کد کالا؛ برند از نگاشت کد/پیشوند تعیین می‌شود و برای کد ناشناخته از کاربر پرسیده می‌شود.
+- موجودی بین ماه‌ها پیوسته است و انبار در مدل محاسباتی دخالت ندارد.
+- بهای تمام‌شده فروش با FIFO لایه‌های خرید محاسبه می‌شود.
+- قیمت پیشنهادی فروش دستی از آخرین قیمت خرید و درصد سود برند ساخته می‌شود؛ کاربر می‌تواند آن را تغییر دهد.
+- از فروش فقط `کسورات` کم می‌شود. اضافات و مالیات منبع به محاسبه اضافه نمی‌شوند.
+- تخفیف نقدی فقط از سهم فروش نقدی کم می‌شود؛ سهم چکی دست‌نخورده است.
+- کسری موجودی هرگز خودکار ثبت نمی‌شود. کاربر باید تعدیل دستی را با تاریخ همان فروش تأیید کند.
+- ماه بسته، ورود و ثبت تراکنش جدید را نمی‌پذیرد تا صریحاً باز شود.
 
-## Projects
+## اکسل و موجودی افتتاحیه
 
-- Core: business rules, local database, bounded OOXML input/output (no macro execution).
-- Desktop: dashboard, monthly files, brand/product editor, monthly comparison, printing, Excel transfer, backup/restore and per-user first-run installer.
-- Tests: executable acceptance suite for financial outcomes, zero-sales handling, persistence, backup, month independence and spreadsheet roundtrip.
-- build-windows.ps1: runs tests and packages the self-contained installer. For the build operator, not the end user.
-- .github/workflows/windows-build.yml: Windows hosted build; not run or uploaded automatically in this conversation.
-- TODO.fa.md: فهرست کارهای تأییدشده و موارد نیازمند تصمیم محصول.
+- ورود خرید/فروش فایل‌های `.xls` SpreadsheetML و `.xlsx` را می‌پذیرد.
+- ستون‌های منبع: تاریخ، نام حساب، کد کالا، نام کالا، تعداد واحد اصلی، قیمت، قیمت کل و کسورات.
+- ردیف‌های بدون مبلغ یا با مبلغ/قیمت حداکثر ۹۹ ریال (آفر/تستر) نادیده گرفته می‌شوند.
+- نام حساب خرید تأمین‌کننده و نام حساب فروش مشتری است.
+- ردیف‌های تکراری هر فایل با شناسهٔ هش فایل و شماره ردیف دوباره وارد نمی‌شوند.
+- فایل ZIP سال ۱۴۰۴ فقط ماندهٔ FIFO ابتدای ۱۴۰۵ را استخراج می‌کند؛ خرید و فروش ۱۴۰۴ در داشبورد یا گزارش ماه‌های ۱۴۰۵ نمایش داده نمی‌شوند. کسری‌های تاریخی فقط گزارش می‌شوند.
 
-## Build operator
+## پروژه‌ها
 
-Run `./build-windows.ps1` with .NET 10 SDK on a trusted Windows x64 build host. The output package includes a self-contained EXE; the user does not need an SDK or installed .NET. The EXE named `MonthlyProfit-Setup.exe` offers per-user installation and creates shortcuts, copying itself to `MonthlyProfit.exe`. It does not modify the separate data directory. The resulting executable is unsigned until a release operator signs it.
+- `Core`: مدل دفتر تراکنش، SQLite، FIFO، واردکننده اکسل و خروجی اکسل.
+- `Desktop`: داشبورد، ثبت دستی، مدیریت برندها، مغایرت، موجودی افتتاحیه، گزارش و پشتیبان.
+- `Tests`: آزمون‌های قواعد قدیمی سازگار، FIFO، کسری، موجودی افتتاحیه و خروجی اکسل.
 
-The current sandbox could download and verify SDK 10.0.400 SHA512, but could not initialize CoreCLR (`HRESULT 0x8007000E`). Accordingly no C# build/test execution or WPF visual acceptance is claimed. Static project/XML and independent reference calculations are the only locally runnable verification until a build host is available.
+## ساخت روی ویندوز
 
-## Required Windows acceptance gate
+با .NET 10 SDK در PowerShell اجرا کنید:
 
-1. Build and run the included C# tests; no failures or compile errors.
-2. Install on clean Windows 11 x64 and the target Windows 10 edition/build without preinstalled .NET or Excel, then launch offline as a standard user. .NET 10 official OS support varies by Windows edition/lifecycle; do not declare blanket Windows 10 support.
-3. Test RTL UI at 100%, 125%, 150% scaling; modal editor, amount formatting, small window, keyboard navigation and print output.
-4. Create two months and two products in the same brand with different prices/rates. Save, close and reopen; verify persistence and historical independence.
-5. Validate blank/text/negative input, share totals, zero sales, losses, fractional quantity and duplicate products.
-6. Import the original workbook, reconcile cost 18,070,000; sales 26,634,400; profit 8,564,400; net -43,435,600 rials. Double shampoo quantity from 2 to 4: price/unit stays 5,200,000; sales and product profit double.
-7. Backup to external folder, edit data, restore, verify safety copy and all months. Attempt corrupt/incompatible backups; active data must remain intact.
-8. Reinstall over an existing version with the app closed; check data survival and shortcuts. Test installer when app is running; require closing the app.
-9. Open Excel export in Excel/LibreOffice and reimport it. Check precision, percent formatting and absence of active formulas or external links.
+```powershell
+./build-windows.ps1
+```
 
-## Sources consulted
+داده‌ها در `%LOCALAPPDATA%\MonthlyProfit\Data\monthly-profit.sqlite` ذخیره می‌شوند. مهاجرت نسخهٔ ۰٫۳ داده‌های آزمایشی مدل قدیمی را حذف می‌کند، زیرا با دفتر تراکنش ناسازگارند.
 
-- https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview
-- https://learn.microsoft.com/en-us/dotnet/desktop/wpf/overview/
-- https://learn.microsoft.com/en-us/windows/apps/develop/data-access/sqlite-data-access
-- https://github.com/dotnet/core/blob/main/release-notes/10.0/supported-os.md
+## وضعیت اعتبارسنجی
+
+فایل‌های XAML و اتصال رویدادهای رابط به‌صورت ایستا بررسی شده‌اند. اجرای CoreCLR در محیط فعلی با `HRESULT 0x8007000E` متوقف می‌شود؛ بنابراین ساخت و اجرای آزمون‌های C# باید با `build-windows.ps1` روی ویندوز انجام شود.

@@ -55,6 +55,93 @@ public sealed record Preferences
     public string? LastBackupPath { get; init; }
 }
 
+// نسخهٔ جدید برنامه، کالا را با کد آن می‌شناسد و درصدها را در سطح برند نگه می‌دارد.
+public sealed record Brand
+{
+    public string Name { get; init; } = "";
+    public decimal PurchaseDiscount { get; init; }
+    public decimal Offer { get; init; }
+    public decimal Markup { get; init; } = .04m;
+    public decimal CreditShare { get; init; } = .70m;
+    public decimal CashShare { get; init; } = .30m;
+    public decimal CashDiscount { get; init; } = .05m;
+}
+
+public sealed record CatalogItem
+{
+    public string Code { get; init; } = "";
+    public string Name { get; init; } = "";
+    public string Brand { get; init; } = "";
+}
+
+public sealed record Purchase
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Date { get; init; } = ""; // yyyyMMdd شمسی
+    public string Code { get; init; } = "";
+    public string Supplier { get; init; } = "";
+    public decimal Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public decimal Total { get; init; }
+    public decimal Deductions { get; init; }
+    public decimal BrandDiscount { get; init; }
+    public decimal Offer { get; init; }
+    public bool IsAdjustment { get; init; }
+    public string Note { get; init; } = "";
+    public string ImportKey { get; init; } = "";
+}
+
+public sealed record Sale
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Date { get; init; } = ""; // yyyyMMdd شمسی
+    public string Code { get; init; } = "";
+    public string Customer { get; init; } = "";
+    public decimal Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public decimal Total { get; init; }
+    public decimal Deductions { get; init; }
+    // Snapshot تنظیمات برند در زمان ثبت فروش، تا گزارش ماه‌های بسته تغییر نکند.
+    public decimal CreditShare { get; init; }
+    public decimal CashShare { get; init; }
+    public decimal CashDiscount { get; init; }
+    public string ImportKey { get; init; } = "";
+}
+
+// ماندهٔ محاسبه‌شده از فایل‌های سال قبل؛ این سطرها در گزارش ماه‌های ۱۴۰۵ نمایش داده نمی‌شوند.
+public sealed record OpeningLot
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Code { get; init; } = "";
+    public decimal Quantity { get; init; }
+    public decimal UnitCost { get; init; }
+    public string SourceDate { get; init; } = "";
+}
+
+public sealed record Ledger
+{
+    public List<Brand> Brands { get; init; } = [];
+    public List<CatalogItem> Items { get; init; } = [];
+    public List<Purchase> Purchases { get; init; } = [];
+    public List<Sale> Sales { get; init; } = [];
+    public List<OpeningLot> OpeningLots { get; init; } = [];
+    public List<string> ImportedRows { get; init; } = [];
+}
+
+public sealed record SaleSettlement(decimal Cost, decimal Cash, decimal Credit, decimal Shortage)
+{
+    public decimal Sales => Cash + Credit;
+    public decimal Profit => Sales - Cost;
+}
+
+public sealed record StockRow(string Code, string Name, string Brand, decimal Quantity, decimal Cost);
+public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, decimal Profit, decimal FixedCost, decimal Quantity, int Products, int Brands)
+{
+    public decimal Sales => Cash + Credit;
+    public decimal Net => Profit - FixedCost;
+    public decimal? Margin => Sales == 0 ? null : Profit / Sales;
+}
+
 public sealed record Result(decimal Purchase, decimal Discount, decimal AfterDiscount, decimal Offer,
     decimal Cost, decimal AddedPrice, decimal UnitSale, decimal Cash, decimal Credit)
 {
@@ -134,6 +221,47 @@ public static class Rules
     public static decimal Number(string s) => decimal.TryParse(Digits(s), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var n) ? n : throw new FormatException("عدد نامعتبر است: " + s);
     public static string Money(decimal n) => n.ToString("#,##0.##", CultureInfo.InvariantCulture);
     public static string Percent(decimal? n) => n.HasValue ? (n.Value * 100).ToString("0.##", CultureInfo.InvariantCulture) + "٪" : "تعریف‌نشده";
+    public static bool ValidDate(string value) => value.Length == 8 && value.All(char.IsDigit) && ValidMonth(value[..4] + "/" + value[4..6]) && int.TryParse(value[6..], out var day) && day is >= 1 and <= 31;
+    public static string MonthOf(string date)
+    {
+        date = Digits(date);
+        if (!ValidDate(date)) throw new InvalidDataException("تاریخ باید مانند 14050421 باشد.");
+        return date[..4] + "/" + date[4..6];
+    }
+    public static decimal NetPurchase(Purchase p) => p.Total - p.Deductions - (p.Total * p.BrandDiscount) - (p.Total * p.Offer);
+    public static decimal NetSaleBase(Sale s) => s.Total - s.Deductions;
+    public static (decimal Cash, decimal Credit) SplitSale(Sale s)
+    {
+        var baseSale = NetSaleBase(s);
+        var cash = baseSale * s.CashShare * (1 - s.CashDiscount);
+        var credit = baseSale * s.CreditShare;
+        return (cash, credit);
+    }
+    public static void Validate(Brand b)
+    {
+        if (string.IsNullOrWhiteSpace(b.Name) || b.Name.Trim().Length > 120) throw new InvalidDataException("نام برند نامعتبر است.");
+        if (new[] { b.PurchaseDiscount, b.Offer, b.Markup, b.CreditShare, b.CashShare, b.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای برند باید بین صفر و ۱۰۰ باشند.");
+        if (b.PurchaseDiscount + b.Offer > 1) throw new InvalidDataException("جمع تخفیف خرید و آفر نباید از ۱۰۰٪ بیشتر باشد.");
+        if (b.CashShare + b.CreditShare != 1) throw new InvalidDataException("جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.");
+    }
+    public static void Validate(CatalogItem item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Code) || item.Code.Length > 60 || !item.Code.All(char.IsLetterOrDigit)) throw new InvalidDataException("کد کالا نامعتبر است.");
+        if (string.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 250 || string.IsNullOrWhiteSpace(item.Brand)) throw new InvalidDataException("نام کالا و برند الزامی هستند.");
+    }
+    public static void Validate(Purchase p)
+    {
+        if (!ValidDate(p.Date) || string.IsNullOrWhiteSpace(p.Code) || p.Quantity <= 0 || p.Total <= 0 || p.Deductions < 0 || p.BrandDiscount < 0 || p.Offer < 0 || NetPurchase(p) < 0) throw new InvalidDataException("اطلاعات خرید نامعتبر است.");
+    }
+    public static void Validate(Sale s)
+    {
+        if (!ValidDate(s.Date) || string.IsNullOrWhiteSpace(s.Code) || s.Quantity <= 0 || s.Total <= 0 || s.Deductions < 0 || s.CashShare < 0 || s.CreditShare < 0 || s.CashDiscount < 0 || s.CashShare + s.CreditShare != 1 || s.CashDiscount > 1 || NetSaleBase(s) < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+    }
+    public static void Validate(OpeningLot lot)
+    {
+        if (string.IsNullOrWhiteSpace(lot.Id) || string.IsNullOrWhiteSpace(lot.Code) || lot.Code.Length > 60 || !lot.Code.All(char.IsLetterOrDigit) || !ValidDate(lot.SourceDate) || lot.Quantity <= 0 || lot.UnitCost < 0)
+            throw new InvalidDataException("موجودی افتتاحیه نامعتبر است.");
+    }
     public static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
     public static Month Sample(string key) => new() { Key = key, Products = new[] { "فیکورس", "سالومه", "لاکچری", "کاسه ای", "شامپو لاکچری", "ضد آفتاب" }.Select((b, i) => new Product { Brand = b, Name = "کالای نمونه " + (i + 1), Price = (i + 1) * 1_000_000m, Quantity = i == 4 ? 2 : 1 }).ToList() };
 }

@@ -25,15 +25,11 @@
 <TextBlock x:Name="ClosedBadge" Text="ماه باز" Foreground="#157347" VerticalAlignment="Center"/>
 </Border>
 <ComboBox x:Name="Months" Width="112" SelectionChanged="MonthChanged" Margin="0,0,5,0"/>
-<Button Content="+ ماه جدید" Click="NewMonth" Style="{StaticResource Primary}" Margin="0,0,5,0"/>
+<Button Content="مدیریت برند" Click="ManageBrands" Style="{StaticResource Primary}" Margin="0,0,5,0"/>
 <Button Content="⋯" Click="OpenMonthMenu" Width="34" FontSize="18" FontWeight="SemiBold" Padding="0,0,0,4" ToolTip="عملیات ماه">
 <Button.ContextMenu>
 <ContextMenu FlowDirection="RightToLeft">
-<MenuItem Header="کپی از ماه فعال" Click="CloneMonth"/>
-<MenuItem Header="ویرایش نام ماه" Click="EditMonth"/>
 <MenuItem Header="بستن / باز کردن ماه" Click="ToggleMonthClosed"/>
-<Separator/>
-<MenuItem Header="حذف ماه" Click="DeleteMonth" Foreground="#B42318"/>
 </ContextMenu>
 </Button.ContextMenu>
 </Button>
@@ -116,53 +112,53 @@
 </Grid>
 </ScrollViewer>
 </TabItem>
-<TabItem Header="کالاها و فروش">
+<TabItem Header="خرید، فروش و موجودی">
 <DockPanel Margin="22">
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}">
 <StackPanel>
 <StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
-<TextBlock Text="کالاهای ماه جاری" Style="{StaticResource PageTitle}"/>
+<TextBlock Text="گردش کالا در ماه جاری" Style="{StaticResource PageTitle}"/>
 <TextBlock x:Name="ProductCount" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 <DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,12,0,0">
 <WrapPanel DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right">
 <TextBlock Text="جست‌وجو:" Style="{StaticResource FieldLabel}" VerticalAlignment="Center" Margin="6,0,2,0"/>
-<TextBox x:Name="ProductSearch" Width="240" Margin="4" ToolTip="جست‌وجوی نام کالا یا برند" TextChanged="ProductFilterChanged"/>
+<TextBox x:Name="ProductSearch" Width="240" Margin="4" ToolTip="جست‌وجوی کد، نام کالا یا برند" TextChanged="ProductFilterChanged"/>
 <ComboBox x:Name="BrandFilter" Width="160" SelectionChanged="ProductFilterChanged"/>
 <Button Content="پاک کردن جست‌وجو" Click="ClearProductFilter"/>
 <Border Width="1" Height="30" Background="#E4E8EF" Margin="10,0" VerticalAlignment="Center"/>
-<Button Content="+ افزودن کالا" Click="AddProduct" Style="{StaticResource Primary}"/>
-<Button x:Name="EditProductButton" Content="ویرایش" Click="EditProduct" IsEnabled="False"/>
-<Button x:Name="DeleteProductButton" Content="حذف" Click="DeleteProduct" IsEnabled="False"/>
-<Button x:Name="UndoDeleteButton" Content="بازگردانی حذف" Click="UndoDelete" IsEnabled="False"/>
+<Button Content="+ خرید دستی" Click="AddPurchase" Style="{StaticResource Primary}"/>
+<Button Content="+ فروش دستی" Click="AddSale"/>
+<Button Content="کنترل مغایرت" Click="ReviewReconciliations"/>
 </WrapPanel>
 </DockPanel>
 </StackPanel>
 </Border>
 <Border DockPanel.Dock="Bottom" Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="13">
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right">
-<Button Content="ورود از اکسل" Click="ImportExcel"/>
-<Button Content="خروجی ماه فعال" Click="ExportExcel" Style="{StaticResource Primary}"/>
+<Button Content="موجودی افتتاحیه از ۱۴۰۴" Click="ImportOpeningInventory"/>
+<Button Content="ورود خرید از اکسل" Click="ImportPurchases"/>
+<Button Content="ورود فروش از اکسل" Click="ImportSales" Style="{StaticResource Primary}"/>
 </WrapPanel>
 </Border>
 <Grid>
-<DataGrid x:Name="ItemsGrid" MouseDoubleClick="EditProduct" SelectionChanged="ItemsSelectionChanged">
+<DataGrid x:Name="ItemsGrid" SelectionChanged="ItemsSelectionChanged">
 <DataGrid.Columns>
-<DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.2*" ElementStyle="{StaticResource TableText}"/>
+<DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="1.05*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.1*" ElementStyle="{StaticResource TableText}"/>
 <DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="1.55*" ElementStyle="{StaticResource TableText}"/>
-<DataGridTextColumn Header="قیمت خرید واحد" Binding="{Binding PriceText}" Width="1.3*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="مقدار" Binding="{Binding QuantityText}" Width="0.75*" ElementStyle="{StaticResource TableCenter}"/>
-<DataGridTextColumn Header="بهای تمام‌شده" Binding="{Binding CostText}" Width="1.3*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="فروش کل" Binding="{Binding SalesText}" Width="1.3*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.3*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="حاشیه سود" Binding="{Binding MarginText}" Width="0.9*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="موجودی" Binding="{Binding StockText}" Width="0.7*" ElementStyle="{StaticResource TableCenter}"/>
+<DataGridTextColumn Header="خرید" Binding="{Binding PurchaseText}" Width="1.1*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.15*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="بهای فروش‌رفته" Binding="{Binding CostText}" Width="1.2*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.15*" ElementStyle="{StaticResource TableNumber}"/>
 </DataGrid.Columns>
 </DataGrid>
 <Border x:Name="ItemsEmpty" Visibility="Collapsed" Background="White">
 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="320">
-<TextBlock Text="هنوز کالایی برای نمایش نیست" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Center"/>
-<TextBlock Text="برای شروع، اولین کالا را در همین ماه ثبت کنید." Style="{StaticResource MutedText}" TextWrapping="Wrap" TextAlignment="Center"/>
-<Button Content="+ افزودن کالا" Click="AddProduct" Style="{StaticResource Primary}" HorizontalAlignment="Center" MinWidth="170"/>
+<TextBlock Text="هنوز تراکنشی برای نمایش نیست" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Center"/>
+<TextBlock Text="خرید یا فروش را دستی ثبت کنید یا فایل اکسل وارد کنید." Style="{StaticResource MutedText}" TextWrapping="Wrap" TextAlignment="Center"/>
+<Button Content="+ خرید دستی" Click="AddPurchase" Style="{StaticResource Primary}" HorizontalAlignment="Center" MinWidth="170"/>
 </StackPanel>
 </Border>
 </Grid>
