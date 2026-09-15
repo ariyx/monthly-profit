@@ -114,7 +114,7 @@ public static class ExcelTransfer
     {
         var calc = LedgerCalculator.Calculate(ledger); var total = LedgerCalculator.SummarizeMonth(ledger, month);
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var rows = new List<object?[]> { ["نوع", "تاریخ", "کد کالا", "برند", "کالا", "حساب", "تعداد", "قیمت واحد", "مبلغ کل", "کسورات", "مبلغ پس از کسورات", "بهای تمام‌شده", "سود ناخالص"] };
+        var rows = new List<object?[]> { new object?[] { "نوع", "تاریخ", "کد کالا", "برند", "کالا", "حساب", "تعداد", "قیمت واحد", "مبلغ کل", "کسورات", "مبلغ پس از کسورات", "بهای تمام‌شده", "سود ناخالص" } };
         foreach (var p in ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == month.Key).OrderBy(x => x.Date).ThenBy(x => x.Id))
         {
             var item = items[p.Code]; rows.Add([p.IsAdjustment ? "تعدیل موجودی" : "خرید", p.Date, p.Code, item.Brand, item.Name, p.Supplier, p.Quantity, p.UnitPrice, p.Total, p.Deductions, Rules.NetPurchase(p), null, null]);
@@ -123,17 +123,27 @@ public static class ExcelTransfer
         {
             var item = items[s.Code]; var settled = calc.Sales[s.Id]; rows.Add(["فروش", s.Date, s.Code, item.Brand, item.Name, s.Customer, s.Quantity, s.UnitPrice, s.Total, s.Deductions, settled.Sales, settled.Cost, settled.Profit]);
         }
-        var summary = new List<object?[]> { ["عنوان", "مقدار"], ["ماه شمسی", month.Key], ["واحد پول", "ریال"], ["بهای تمام‌شده فروش‌رفته", total.Cost], ["فروش کل", total.Sales], ["سود ناخالص", total.Profit], ["هزینه ثابت ماه", total.FixedCost], ["نتیجه پس از هزینه ثابت", total.Net], ["حاشیه سود", total.Margin] };
+        var summary = new List<object?[]>
+        {
+            new object?[] { "عنوان", "مقدار" }, new object?[] { "ماه شمسی", month.Key }, new object?[] { "واحد پول", "ریال" },
+            new object?[] { "بهای تمام‌شده فروش‌رفته", total.Cost }, new object?[] { "فروش کل", total.Sales }, new object?[] { "سود ناخالص", total.Profit },
+            new object?[] { "هزینه ثابت ماه", total.FixedCost }, new object?[] { "نتیجه پس از هزینه ثابت", total.Net }, new object?[] { "حاشیه سود", total.Margin }
+        };
         WriteSimpleWorkbook(file, rows, summary, "تراکنش‌های ماه", "خلاصه ماه");
     }
     public static void ExportLedgerRange(Ledger ledger, IReadOnlyList<Month> months, string file)
     {
         if (months.Count == 0) throw new InvalidDataException("برای خروجی بازه، حداقل یک ماه لازم است.");
-        var rows = new List<object?[]> { ["ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود"] };
+        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
         var totals = months.OrderBy(x => x.Key).Select(x => (Month: x, Total: LedgerCalculator.SummarizeMonth(ledger, x))).ToList();
         foreach (var x in totals) rows.Add([x.Month.Key, x.Total.Cost, x.Total.Sales, x.Total.Profit, x.Total.FixedCost, x.Total.Net, x.Total.Margin]);
         var sales = totals.Sum(x => x.Total.Sales); var profit = totals.Sum(x => x.Total.Profit);
-        var summary = new List<object?[]> { ["عنوان", "مقدار"], ["از ماه", totals.First().Month.Key], ["تا ماه", totals.Last().Month.Key], ["تعداد ماه", totals.Count], ["بهای تمام‌شده", totals.Sum(x => x.Total.Cost)], ["فروش کل", sales], ["سود ناخالص", profit], ["هزینه ثابت", totals.Sum(x => x.Total.FixedCost)], ["نتیجه", totals.Sum(x => x.Total.Net)], ["حاشیه سود وزنی", sales == 0 ? null : profit / sales] };
+        var summary = new List<object?[]>
+        {
+            new object?[] { "عنوان", "مقدار" }, new object?[] { "از ماه", totals.First().Month.Key }, new object?[] { "تا ماه", totals.Last().Month.Key }, new object?[] { "تعداد ماه", totals.Count },
+            new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Total.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود ناخالص", profit },
+            new object?[] { "هزینه ثابت", totals.Sum(x => x.Total.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Total.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : profit / sales }
+        };
         WriteSimpleWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه");
     }
     static void WriteSimpleWorkbook(string file, List<object?[]> rows, List<object?[]> summary, string firstName, string secondName)
