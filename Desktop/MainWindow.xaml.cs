@@ -20,6 +20,7 @@ public partial class MainWindow : Window
     Preferences preferences = new();
     List<Month> reportMonths = [];
     List<ReconciliationCandidate> reconciliationCandidates = [];
+    List<PendingBrandGridRow> pendingBrandRows = [];
     string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonthlyProfit", "Data");
 
     public MainWindow()
@@ -29,7 +30,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۲ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۳ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -49,7 +50,7 @@ public partial class MainWindow : Window
     }
     void Reload(string? key = null)
     {
-        ledger = BrandPrefixRules.AddInitialPrefixes(store.LoadLedger()); var keys = store.Keys();
+        ledger = BrandPrefixRules.EnsureDefaults(store.LoadLedger()); var keys = store.Keys();
         if (keys.Count == 0) { store.EnsureMonth(CurrentMonth()); keys = store.Keys(); }
         loading = true; var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string; var selected = Months.SelectedItem as string;
         Months.ItemsSource = keys; Months.SelectedItem = key != null && keys.Contains(key) ? key : selected != null && keys.Contains(selected) ? selected : keys.First();
@@ -85,7 +86,7 @@ public partial class MainWindow : Window
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.Firebrick : Brushes.SeaGreen;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin); Fixed.Text = Rules.Money(current.FixedCost);
         Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.Money(t.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.Money(t.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.Money(t.Cash)} ریال\nفروش چکی: {Rules.Money(t.Credit)} ریال\nبهای تمام‌شده فروش‌رفته: {Rules.Money(t.Cost)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}" + (t.Shortage > 0 ? $"\nمغایرت تأییدنشده: {Rules.Money(t.Shortage)} عدد؛ سود قطعی نیست." : "");
-        DrawTransactions(); DrawInventory(); DrawReconciliations(); DrawBrandSettings(); DrawBrands(); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · {ledger.Purchases.Count} خرید و {ledger.Sales.Count} فروش ثبت شده";
+        DrawTransactions(); DrawInventory(); DrawReconciliations(); DrawPendingBrands(); DrawBrandSettings(); DrawBrands(); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · {ledger.Purchases.Count} خرید و {ledger.Sales.Count} فروش ثبت شده";
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
     void SaveMonth(Month next, string action)
@@ -169,6 +170,50 @@ public partial class MainWindow : Window
             SaveLedger(ledger with { Purchases = [.. ledger.Purchases, .. adjustments] }, $"مغایرت کد {candidate.Code} تأیید و تعدیل شد", Rules.MonthOf(candidate.FirstDate));
         });
     }
+    void PendingBrandSearchChanged(object s, TextChangedEventArgs e) => ApplyPendingBrandFilter();
+    void ClearPendingBrandSearch(object s, RoutedEventArgs e) => PendingBrandSearch.Text = "";
+    void PendingBrandSelectionChanged(object s, SelectionChangedEventArgs e)
+    {
+        if (PendingBrandsGrid.SelectedItem is not PendingBrandGridRow row) return;
+        PendingBrandPrefix.Text = Rules.Digits(row.Code)[..Math.Min(3, Rules.Digits(row.Code).Length)];
+        PendingBrandName.Text = "";
+    }
+    void ConfirmPendingBrand(object s, RoutedEventArgs e)
+    {
+        Guard(() =>
+        {
+            if (PendingBrandsGrid.SelectedItem is not PendingBrandGridRow selected) throw new InvalidOperationException("ابتدا یک کد ناشناخته را از جدول انتخاب کنید.");
+            var brandName = Rules.Normalize(PendingBrandName.Text);
+            var brand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name).Equals(brandName, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("این برند ثبت نشده است. ابتدا آن را در مدیریت برندها ایجاد کنید.");
+            var prefixes = BrandPrefixRules.Parse(PendingBrandPrefix.Text);
+            if (prefixes.Count > 1) throw new InvalidDataException("برای این تأیید فقط یک پیشوند وارد کنید.");
+            var targets = prefixes.Count == 0
+                ? selected.Values
+                : ledger.PendingBrandTransactions.Where(x => Rules.Digits(x.Transaction.Code).StartsWith(prefixes[0], StringComparison.Ordinal)).ToList();
+            if (targets.Count == 0) throw new InvalidDataException("ردیفی برای پردازش یافت نشد.");
+            foreach (var row in targets) if (!CanEdit(Rules.MonthOf(row.Transaction.Date))) throw new InvalidOperationException($"ماه {Rules.MonthOf(row.Transaction.Date)} بسته است؛ ابتدا آن را باز کنید.");
+
+            var brands = ledger.Brands.ToList();
+            if (prefixes.Count == 1 && !brand.CodePrefixes.Select(Rules.Digits).Contains(prefixes[0], StringComparer.Ordinal))
+            {
+                var index = brands.FindIndex(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase));
+                brands[index] = brand with { CodePrefixes = [.. brand.CodePrefixes, prefixes[0]] };
+                brand = brands[index]; BrandPrefixRules.ValidateUnique(brands);
+            }
+            var items = ledger.Items.ToList();
+            foreach (var group in targets.GroupBy(x => x.Transaction.Code, StringComparer.OrdinalIgnoreCase))
+            {
+                var first = group.First().Transaction; var itemIndex = items.FindIndex(x => x.Code.Equals(first.Code, StringComparison.OrdinalIgnoreCase));
+                if (itemIndex < 0) items.Add(new CatalogItem { Code = first.Code, Name = first.Name, Brand = brand.Name });
+                else if (!Rules.Normalize(items[itemIndex].Brand).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"کد {first.Code} قبلاً با برند دیگری ثبت شده است.");
+            }
+            var purchases = targets.Where(x => x.Kind == TransactionKind.Purchase).Select(x => x.Transaction).Select(row => new Purchase { Date = row.Date, Code = row.Code, Supplier = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, BrandDiscount = brand.PurchaseDiscount, Offer = brand.Offer, ImportKey = row.ImportKey, Note = "ورود اکسل پس از تعیین برند" }).ToList();
+            var sales = targets.Where(x => x.Kind == TransactionKind.Sale).Select(x => x.Transaction).Select(row => new Sale { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, CashShare = brand.CashShare, CreditShare = brand.CreditShare, CashDiscount = brand.CashDiscount, ImportKey = row.ImportKey }).ToList();
+            var ids = targets.Select(x => x.Id).ToHashSet();
+            var next = ledger with { Brands = brands, Items = items, Purchases = [.. ledger.Purchases, .. purchases], Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. targets.Select(x => x.Transaction.ImportKey)], PendingBrandTransactions = ledger.PendingBrandTransactions.Where(x => !ids.Contains(x.Id)).ToList() };
+            SaveLedger(next, $"{targets.Count} ردیف با برند «{brand.Name}» پردازش شد", Rules.MonthOf(targets.MaxBy(x => x.Transaction.Date)!.Transaction.Date));
+        });
+    }
     void ImportPurchases(object s, RoutedEventArgs e) => ImportTransactions(TransactionKind.Purchase);
     void ImportSales(object s, RoutedEventArgs e) => ImportTransactions(TransactionKind.Sale);
     void ImportOpeningInventory(object s, RoutedEventArgs e)
@@ -198,8 +243,10 @@ public partial class MainWindow : Window
                 if (review.Issues.Count > 0) note += $"\n{review.Issues.Count} مغایرت تاریخی وجود دارد و خودکار وارد موجودی نمی‌شود؛ بعداً دستی کنترل کنید.";
                 if (ledger.OpeningLots.Count > 0) note += "\nموجودی افتتاحیه قبلی جایگزین خواهد شد.";
                 if (MessageBox.Show(this, note, "موجودی افتتاحیه", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-                // برای نمایش موجودی افتتاحیه، کدها و برندهای کالاهای خریداری‌شده نیز یک‌بار در کاتالوگ ثبت می‌شوند.
-                var next = ledger; ResolveImportItems(ref next, purchaseReview.Rows);
+                // برای نمایش موجودی افتتاحیه، فقط کدهایی که قاعدهٔ برند دارند در کاتالوگ ثبت می‌شوند.
+                var next = BrandPrefixRules.EnsureDefaults(ledger);
+                var knownOpeningRows = purchaseReview.Rows.Where(x => next.Items.Any(y => y.Code.Equals(x.Code, StringComparison.OrdinalIgnoreCase)) || BrandPrefixRules.Detect(next.Brands, x.Code) != null).ToList();
+                ResolveKnownImportItems(ref next, knownOpeningRows);
                 SaveLedger(next with { OpeningLots = review.Lots }, "موجودی افتتاحیه از ۱۴۰۴ استخراج شد");
                 if (review.Issues.Count > 0) MessageBox.Show(this, string.Join("\n", review.Issues.Take(20).Select(x => "ردیف " + x.Row + ": " + x.Message)), "مغایرت‌های تاریخی");
             }
@@ -213,7 +260,8 @@ public partial class MainWindow : Window
         {
             var review = TransactionImport.Review(file.FileName); if (review.Rows.Count == 0) throw new InvalidDataException("ردیف معتبر برای ورود یافت نشد.");
             if (review.Rows.Any(x => int.Parse(x.Date[..4], CultureInfo.InvariantCulture) < 1405)) throw new InvalidDataException("فایل‌های ۱۴۰۴ فقط برای موجودی افتتاحیه استفاده می‌شوند و در این ورود ثبت نمی‌شوند.");
-            var duplicate = review.Rows.Count(x => ledger.ImportedRows.Contains(x.ImportKey)); var candidates = review.Rows.Where(x => !ledger.ImportedRows.Contains(x.ImportKey)).ToList();
+            var importedKeys = ledger.ImportedRows.Concat(ledger.PendingBrandTransactions.Select(x => x.Transaction.ImportKey)).ToHashSet();
+            var duplicate = review.Rows.Count(x => importedKeys.Contains(x.ImportKey)); var candidates = review.Rows.Where(x => !importedKeys.Contains(x.ImportKey)).ToList();
             if (candidates.Count == 0) { MessageBox.Show(this, "همه ردیف‌های معتبر این فایل قبلاً وارد شده‌اند.", title); return; }
             var text = $"{candidates.Count} ردیف معتبر آمادهٔ ورود است. {review.Ignored} ردیف آفر/بدون مبلغ نادیده گرفته شد؛ {review.Issues.Count} ردیف خطادار و {duplicate} ردیف تکراری است. ادامه می‌دهید؟";
             if (MessageBox.Show(this, text, title, MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
@@ -223,48 +271,53 @@ public partial class MainWindow : Window
     void ImportRows(TransactionKind kind, List<ImportedTransaction> rows)
     {
         foreach (var row in rows) if (!CanEdit(Rules.MonthOf(row.Date))) throw new InvalidOperationException($"ماه {Rules.MonthOf(row.Date)} بسته است.");
-        var staged = ledger; var items = ResolveImportItems(ref staged, rows);
+        var staged = BrandPrefixRules.EnsureDefaults(ledger);
+        var existingCodes = staged.Items.Select(x => x.Code).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownRows = rows.Where(x => existingCodes.Contains(x.Code) || BrandPrefixRules.Detect(staged.Brands, x.Code) != null).ToList();
+        var unknownRows = rows.Where(x => !existingCodes.Contains(x.Code) && BrandPrefixRules.Detect(staged.Brands, x.Code) == null).ToList();
+        var items = ResolveKnownImportItems(ref staged, knownRows);
         if (kind == TransactionKind.Purchase)
         {
-            var purchases = rows.Select(row => new Purchase { Date = row.Date, Code = items[row.Code].Code, Supplier = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey, Note = "ورود اکسل" }).ToList();
-            staged = staged with { Purchases = [.. staged.Purchases, .. purchases], ImportedRows = [.. staged.ImportedRows, .. rows.Select(x => x.ImportKey)] };
+            var purchases = knownRows.Select(row =>
+            {
+                var item = items[row.Code];
+                var profile = staged.Brands.Single(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand));
+                return new Purchase { Date = row.Date, Code = item.Code, Supplier = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, BrandDiscount = profile.PurchaseDiscount, Offer = profile.Offer, ImportKey = row.ImportKey, Note = "ورود اکسل" };
+            }).ToList();
+            staged = staged with { Purchases = [.. staged.Purchases, .. purchases], ImportedRows = [.. staged.ImportedRows, .. knownRows.Select(x => x.ImportKey)] };
         }
         else
         {
-            var sales = rows.Select(row =>
+            var sales = knownRows.Select(row =>
             {
                 var item = items[row.Code]; var profile = staged.Brands.Single(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand));
                 return new Sale { Date = row.Date, Code = item.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount, ImportKey = row.ImportKey };
             }).ToList();
-            staged = staged with { Sales = [.. staged.Sales, .. sales], ImportedRows = [.. staged.ImportedRows, .. rows.Select(x => x.ImportKey)] };
+            staged = staged with { Sales = [.. staged.Sales, .. sales], ImportedRows = [.. staged.ImportedRows, .. knownRows.Select(x => x.ImportKey)] };
         }
-        SaveLedger(staged, kind == TransactionKind.Purchase ? "خریدهای اکسل وارد شدند" : "فروش‌های اکسل وارد شدند؛ مغایرت‌های احتمالی در تب مغایرت‌ها آمادهٔ بررسی هستند.", Rules.MonthOf(rows.MaxBy(x => x.Date)!.Date));
+        if (unknownRows.Count > 0) staged = staged with { PendingBrandTransactions = [.. staged.PendingBrandTransactions, .. unknownRows.Select(x => new PendingBrandTransaction { Kind = kind, Transaction = x })] };
+        var label = kind == TransactionKind.Purchase ? "خرید" : "فروش";
+        var message = $"{knownRows.Count} ردیف {label} وارد شد" + (unknownRows.Count == 0 ? "." : $"؛ {unknownRows.Count} ردیف با کد ناشناخته در تب «کدهای ناشناخته» منتظر تعیین برند است.");
+        SaveLedger(staged, message, Rules.MonthOf(rows.MaxBy(x => x.Date)!.Date));
+        if (unknownRows.Count > 0)
+        {
+            MainTabs.SelectedIndex = 5;
+            PendingBrandSearch.Focus();
+        }
     }
 
-    Dictionary<string, CatalogItem> ResolveImportItems(ref Ledger state, List<ImportedTransaction> rows)
+    Dictionary<string, CatalogItem> ResolveKnownImportItems(ref Ledger state, List<ImportedTransaction> rows)
     {
-        state = BrandPrefixRules.AddInitialPrefixes(state);
+        state = BrandPrefixRules.EnsureDefaults(state);
         var currentBrands = state.Brands;
         var result = state.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var unknown = rows.Where(x => !result.ContainsKey(x.Code) && BrandPrefixRules.Detect(currentBrands, x.Code) == null).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
-            .Select(x => new UnknownBrandCandidate(x.Key, x.First().Name)).ToList();
-        Dictionary<string, string> manual = new(StringComparer.OrdinalIgnoreCase);
-        if (unknown.Count > 0)
-        {
-            var dialog = new UnknownBrandDialog(unknown, currentBrands.Select(x => x.Name)) { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.Assignments == null) throw new OperationCanceledException();
-            manual = dialog.Assignments;
-        }
-        var brands = currentBrands.ToList();
         foreach (var row in rows)
         {
             if (result.ContainsKey(row.Code)) continue;
-            var brandName = BrandPrefixRules.Detect(brands, row.Code)?.Name ?? manual[row.Code];
-            var profile = brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brandName));
-            if (profile == null) { profile = new Brand { Name = Rules.Normalize(brandName) }; brands.Add(profile); }
+            var profile = BrandPrefixRules.Detect(currentBrands, row.Code) ?? throw new InvalidDataException($"برای کد {row.Code} برند ثبت نشده است.");
             result[row.Code] = new CatalogItem { Code = row.Code, Name = row.Name, Brand = profile.Name };
         }
-        state = state with { Brands = brands, Items = result.Values.OrderBy(x => x.Code).ToList() };
+        state = state with { Items = result.Values.OrderBy(x => x.Code).ToList() };
         return result;
     }
     void DrawTransactions()
@@ -315,6 +368,20 @@ public partial class MainWindow : Window
             .Select(x => new ReconciliationGridRow(x)).ToList();
         ReconciliationsGrid.ItemsSource = visible;
         if (visible.Count == 0) ReconciliationUnitCost.Text = "";
+    }
+
+    void DrawPendingBrands()
+    {
+        pendingBrandRows = ledger.PendingBrandTransactions.GroupBy(x => x.Transaction.Code, StringComparer.OrdinalIgnoreCase).Select(x => new PendingBrandGridRow(x.ToList()))
+            .OrderBy(x => x.FirstDate, StringComparer.Ordinal).ThenBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToList();
+        ApplyPendingBrandFilter();
+        PendingBrandSummary.Text = pendingBrandRows.Count == 0 ? "همهٔ کدهای واردشده با قواعد برند تشخیص داده شده‌اند." : $"{pendingBrandRows.Count} کد و {ledger.PendingBrandTransactions.Count} ردیف هنوز برند ندارند. نام یک برند ثبت‌شده را تایپ کنید و در صورت لزوم پیشوند آن را وارد کنید؛ با تأیید، همهٔ ردیف‌های منطبق پردازش می‌شوند.";
+    }
+    void ApplyPendingBrandFilter()
+    {
+        if (PendingBrandsGrid == null) return;
+        var needle = Rules.Normalize(PendingBrandSearch?.Text ?? "");
+        PendingBrandsGrid.ItemsSource = pendingBrandRows.Where(x => needle.Length == 0 || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     void DrawBrandSettings()
@@ -383,7 +450,7 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup(); var enabled = preferences.AutoBackupOnExit; AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال"; AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray; AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است"; LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm"); var manual = preferences.LastBackupUtc != null; ManualBackupBadgeText.Text = manual ? "ثبت شده" : "ثبت نشده"; ManualBackupBadgeText.Foreground = manual ? Brushes.SeaGreen : Brushes.SlateGray; ManualBackupBadge.Background = manual ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); LastManualBackup.Text = manual ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
-    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
+    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۳ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
 public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purchase, decimal sales, decimal cost, decimal profit, decimal shortage)
@@ -411,6 +478,16 @@ public sealed class ReconciliationGridRow(ReconciliationCandidate value)
     public ReconciliationCandidate Candidate => value;
     public string FirstDate => value.FirstDate; public string Code => value.Code; public string Brand => value.Brand; public string Name => value.Name; public decimal Quantity => value.Quantity; public int SaleRows => value.SaleRows;
     public string QuantityText => Rules.Money(value.Quantity); public string SuggestedText => value.SuggestedUnitCost <= 0 ? "نیازمند ورود دستی" : Rules.Money(value.SuggestedUnitCost);
+}
+public sealed class PendingBrandGridRow(List<PendingBrandTransaction> values)
+{
+    public List<PendingBrandTransaction> Values => values;
+    public string Code => values[0].Transaction.Code;
+    public string Name => values[0].Transaction.Name;
+    public int PurchaseRows => values.Count(x => x.Kind == TransactionKind.Purchase);
+    public int SaleRows => values.Count(x => x.Kind == TransactionKind.Sale);
+    public string QuantityText => Rules.Money(values.Sum(x => x.Transaction.Quantity));
+    public string FirstDate => values.Min(x => x.Transaction.Date);
 }
 public sealed class BrandSettingsRow(Brand brand)
 {

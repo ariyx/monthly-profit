@@ -91,120 +91,6 @@ public sealed class BrandEditorDialog : Window
     }
 }
 
-public sealed class ReconciliationDialog : Window
-{
-    sealed class Row
-    {
-        public required ReconciliationCandidate Candidate { get; init; }
-        public string Code => Candidate.Code;
-        public string Name => Candidate.Name;
-        public string Brand => Candidate.Brand;
-        public string FirstDate => Candidate.FirstDate;
-        public string Quantity => Rules.Money(Candidate.Quantity);
-        public string SaleRows => Candidate.SaleRows.ToString(CultureInfo.InvariantCulture);
-        public string UnitCost { get; set; } = "";
-    }
-    readonly List<Row> rows;
-    readonly TextBlock error = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right };
-    public Dictionary<string, decimal>? UnitCosts { get; private set; }
-
-    public ReconciliationDialog(IEnumerable<ReconciliationCandidate> candidates)
-    {
-        Title = "رسیدگی گروهی مغایرت‌ها"; Width = 1100; Height = 650; MinWidth = 820; MinHeight = 480; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        rows = candidates.Select(x => new Row { Candidate = x, UnitCost = x.SuggestedUnitCost <= 0 ? "" : Rules.Money(x.SuggestedUnitCost) }).ToList();
-        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("رسیدگی گروهی مغایرت‌ها", "برای هر کد، قیمت تعدیل را تأیید یا ویرایش کنید. تعدیل در نخستین تاریخ کسری و پیش از فروش ثبت می‌شود."));
-        var grid = new DataGrid { AutoGenerateColumns = false, Margin = new Thickness(22), ItemsSource = rows, CanUserAddRows = false };
-        grid.Columns.Add(new DataGridTextColumn { Header = "تاریخ", Binding = new System.Windows.Data.Binding("FirstDate"), Width = new DataGridLength(.8, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "کد کالا", Binding = new System.Windows.Data.Binding("Code"), Width = new DataGridLength(.9, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "برند", Binding = new System.Windows.Data.Binding("Brand"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "کالا", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(2, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "کسری", Binding = new System.Windows.Data.Binding("Quantity"), Width = new DataGridLength(.8, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "ردیف فروش", Binding = new System.Windows.Data.Binding("SaleRows"), Width = new DataGridLength(.75, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "قیمت واحد تعدیل — ریال", Binding = new System.Windows.Data.Binding("UnitCost") { Mode = System.Windows.Data.BindingMode.TwoWay, UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = new DataGridLength(1.35, DataGridLengthUnitType.Star) });
-        Grid.SetRow(grid, 1); root.Children.Add(grid);
-        var footer = new StackPanel { Margin = new Thickness(22, 0, 22, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer); footer.Children.Add(error);
-        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; footer.Children.Add(actions); var cancel = new Button { Content = "انصراف" }; var save = new Button { Content = "تأیید و ثبت تعدیل‌ها", Style = (Style)FindResource("Primary") }; actions.Children.Add(cancel); actions.Children.Add(save);
-        cancel.Click += (_, _) => DialogResult = false;
-        save.Click += (_, _) =>
-        {
-            try
-            {
-                UnitCosts = rows.ToDictionary(x => x.Code, x => Rules.Number(x.UnitCost), StringComparer.OrdinalIgnoreCase);
-                if (UnitCosts.Any(x => x.Value <= 0)) throw new InvalidDataException("قیمت تعدیل همه کدها باید بیشتر از صفر باشد.");
-                DialogResult = true;
-            }
-            catch (Exception ex) { error.Text = ex.Message; }
-        };
-    }
-}
-
-public sealed record UnknownBrandCandidate(string Code, string Name);
-
-public sealed class UnknownBrandDialog : Window
-{
-    sealed class Row
-    {
-        public required UnknownBrandCandidate Candidate { get; init; }
-        public string Code => Candidate.Code;
-        public string Name => Candidate.Name;
-        public string Brand { get; set; } = "";
-    }
-    readonly List<Row> rows;
-    readonly TextBlock error = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right };
-    public Dictionary<string, string>? Assignments { get; private set; }
-
-    public UnknownBrandDialog(IEnumerable<UnknownBrandCandidate> candidates, IEnumerable<string> knownBrands)
-    {
-        Title = "تعیین برند کالاهای ناشناخته"; Width = 900; Height = 600; MinWidth = 700; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        rows = candidates.Select(x => new Row { Candidate = x }).ToList();
-        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("تعیین برند کالاهای ناشناخته", "برای هر کد یک برند بنویسید. نام جدید به‌عنوان برند جدید با درصدهای پیش‌فرض ساخته می‌شود."));
-        DataGrid? grid = null;
-        var quickAssign = new StackPanel { Margin = new Thickness(22, 14, 22, 0), Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        quickAssign.Children.Add(new TextBlock { Text = "برای هر ردیف نام برند را در کادر سفید تایپ کنید. ", VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Color.FromRgb(82, 98, 124)) });
-        var defaultBrand = new TextBox { Width = 220, MinHeight = 32, TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft, Padding = new Thickness(8, 4, 8, 4), ToolTip = "برند پیش‌فرض برای ردیف‌های خالی" };
-        quickAssign.Children.Add(defaultBrand);
-        var applyDefault = new Button { Content = "اعمال برای ردیف‌های خالی", Margin = new Thickness(8, 0, 0, 0) };
-        quickAssign.Children.Add(applyDefault);
-        applyDefault.Click += (_, _) =>
-        {
-            var value = Rules.Normalize(defaultBrand.Text);
-            if (value.Length == 0) return;
-            foreach (var row in rows.Where(x => string.IsNullOrWhiteSpace(x.Brand))) row.Brand = value;
-            grid?.Items.Refresh();
-        };
-        Grid.SetRow(quickAssign, 1); root.Children.Add(quickAssign);
-
-        grid = new DataGrid { AutoGenerateColumns = false, Margin = new Thickness(22), ItemsSource = rows, CanUserAddRows = false };
-        grid.Columns.Add(new DataGridTextColumn { Header = "کد کالا", Binding = new System.Windows.Data.Binding("Code"), Width = new DataGridLength(1, DataGridLengthUnitType.Star), IsReadOnly = true });
-        grid.Columns.Add(new DataGridTextColumn { Header = "نام کالا", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(2.5, DataGridLengthUnitType.Star), IsReadOnly = true });
-        var brandCell = new FrameworkElementFactory(typeof(TextBox));
-        brandCell.SetValue(TextBox.MinHeightProperty, 32d);
-        brandCell.SetValue(TextBox.TextAlignmentProperty, TextAlignment.Right);
-        brandCell.SetValue(FrameworkElement.FlowDirectionProperty, FlowDirection.RightToLeft);
-        brandCell.SetValue(Control.PaddingProperty, new Thickness(8, 4, 8, 4));
-        brandCell.SetValue(FrameworkElement.MarginProperty, new Thickness(5, 3, 5, 3));
-        brandCell.SetBinding(TextBox.TextProperty, new System.Windows.Data.Binding("Brand") { Mode = System.Windows.Data.BindingMode.TwoWay, UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged });
-        grid.Columns.Add(new DataGridTemplateColumn { Header = "برند (قابل تایپ)", CellTemplate = new DataTemplate { VisualTree = brandCell }, Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
-        Grid.SetRow(grid, 2); root.Children.Add(grid);
-        var footer = new StackPanel { Margin = new Thickness(22, 0, 22, 18) }; Grid.SetRow(footer, 3); root.Children.Add(footer); footer.Children.Add(error);
-        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; footer.Children.Add(actions); var cancel = new Button { Content = "انصراف" }; var save = new Button { Content = "تأیید برندها", Style = (Style)FindResource("Primary") }; actions.Children.Add(cancel); actions.Children.Add(save);
-        cancel.Click += (_, _) => DialogResult = false;
-        save.Click += (_, _) =>
-        {
-            try
-            {
-                if (rows.Any(x => string.IsNullOrWhiteSpace(x.Brand))) throw new InvalidDataException("برای همه کالاهای ناشناخته برند تعیین کنید.");
-                Assignments = rows.ToDictionary(x => x.Code, x => Rules.Normalize(x.Brand), StringComparer.OrdinalIgnoreCase); DialogResult = true;
-            }
-            catch (Exception ex) { error.Text = ex.Message; }
-        };
-    }
-}
-
 public sealed class PurchaseDialog : Window
 {
     public CatalogItem? Item { get; private set; }
@@ -225,7 +111,11 @@ public sealed class PurchaseDialog : Window
         var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error); var save = new Button { Content = adjustment ? "ثبت تعدیل" : "ثبت خرید", Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(save);
         void Fill()
         {
-            var existing = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(codeBox.Text), StringComparison.OrdinalIgnoreCase)); if (existing != null) { name.Text = existing.Name; brand.Text = existing.Brand; }
+            var normalizedCode = Rules.Normalize(codeBox.Text);
+            var existing = ledger.Items.FirstOrDefault(x => x.Code.Equals(normalizedCode, StringComparison.OrdinalIgnoreCase));
+            if (existing != null) { name.Text = existing.Name; brand.Text = existing.Brand; return; }
+            var detected = BrandPrefixRules.Detect(ledger.Brands, normalizedCode);
+            if (detected != null) brand.Text = detected.Name;
         }
         codeBox.LostFocus += (_, _) => Fill(); Fill();
         save.Click += (_, _) => { try { var normalizedCode = Rules.Normalize(codeBox.Text); var selectedBrand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brand.Text)) ?? throw new InvalidDataException("ابتدا برند کالا را در بخش مدیریت برند ثبت کنید."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); var total = q * price; Item = new CatalogItem { Code = normalizedCode, Name = Rules.Normalize(name.Text), Brand = selectedBrand.Name }; Rules.Validate(Item); Value = new Purchase { Date = Rules.Digits(date.Text), Code = Item.Code, Supplier = Rules.Normalize(supplier.Text), Quantity = q, UnitPrice = price, Total = total, Deductions = Rules.Number(deductions.Text), BrandDiscount = adjustment ? 0 : selectedBrand.PurchaseDiscount, Offer = adjustment ? 0 : selectedBrand.Offer, IsAdjustment = adjustment, Note = adjustment ? "تعدیل موجودی ناشی از مغایرت" : "ثبت دستی" }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };

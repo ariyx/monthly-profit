@@ -71,11 +71,11 @@ public sealed record Brand
 
 public static class BrandPrefixRules
 {
-    // این‌ها فقط برای انتقال داده‌های نسخه‌های قبل به تنظیمات قابل‌ویرایش برند هستند.
+    // تنظیمات اولیهٔ سراسری؛ پس از اولین اجرا کاملاً در «مدیریت برندها» ذخیره و قابل ویرایش‌اند.
     // تشخیص در زمان ورود، تنها از CodePrefixes ذخیره‌شده در خود برند استفاده می‌کند.
-    static readonly IReadOnlyDictionary<string, string[]> InitialPrefixes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    static readonly IReadOnlyDictionary<string, string[]> DefaultPrefixes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
-        ["Fikores"] = ["106"], ["پیکشن"] = ["108"], ["2080"] = ["115", "145"], ["سالومه"] = ["118"],
+        ["Fikores"] = ["106"], ["پیکشن"] = ["108"], ["آذر بیوتی"] = ["112"], ["2080"] = ["115", "145"], ["سالومه"] = ["118"],
         ["مکسی بل"] = ["128"], ["پلیس"] = ["137"], ["سوپکس"] = ["147"], ["پانته‌آ"] = ["161"], ["Blue Night"] = ["162"]
     };
 
@@ -98,15 +98,17 @@ public static class BrandPrefixRules
         if (duplicate != null) throw new InvalidDataException("پیشوند کد «" + duplicate.Key + "» برای بیش از یک برند ثبت شده است.");
     }
 
-    public static Ledger AddInitialPrefixes(Ledger ledger)
+    public static Ledger EnsureDefaults(Ledger ledger)
     {
-        var changed = false;
-        var brands = ledger.Brands.Select(brand =>
+        if (ledger.BrandRulesInitialized) return ledger;
+        var brands = ledger.Brands.ToList();
+        foreach (var (name, prefixes) in DefaultPrefixes)
         {
-            if (brand.CodePrefixes.Count > 0 || !InitialPrefixes.TryGetValue(brand.Name, out var defaults)) return brand;
-            changed = true; return brand with { CodePrefixes = [.. defaults] };
-        }).ToList();
-        return changed ? ledger with { Brands = brands } : ledger;
+            var index = brands.FindIndex(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(name), StringComparison.OrdinalIgnoreCase));
+            if (index < 0) brands.Add(new Brand { Name = name, CodePrefixes = [.. prefixes] });
+            else if (brands[index].CodePrefixes.Count == 0) brands[index] = brands[index] with { CodePrefixes = [.. prefixes] };
+        }
+        return ledger with { Brands = brands, BrandRulesInitialized = true };
     }
 }
 
@@ -163,12 +165,22 @@ public sealed record OpeningLot
 
 public sealed record Ledger
 {
+    public bool BrandRulesInitialized { get; init; }
     public List<Brand> Brands { get; init; } = [];
     public List<CatalogItem> Items { get; init; } = [];
     public List<Purchase> Purchases { get; init; } = [];
     public List<Sale> Sales { get; init; } = [];
     public List<OpeningLot> OpeningLots { get; init; } = [];
     public List<string> ImportedRows { get; init; } = [];
+    public List<PendingBrandTransaction> PendingBrandTransactions { get; init; } = [];
+}
+
+// ردیف واردشده‌ای که برندش هنوز قاعدهٔ سراسری ندارد؛ تا زمان تعیین برند در دفتر فروش/خرید ثبت نمی‌شود.
+public sealed record PendingBrandTransaction
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public TransactionKind Kind { get; init; }
+    public ImportedTransaction Transaction { get; init; } = new(0, "", "", "", "", "", 0, 0, 0, 0);
 }
 
 public sealed record SaleSettlement(decimal Cost, decimal Cash, decimal Credit, decimal Shortage)
