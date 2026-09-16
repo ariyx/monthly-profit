@@ -48,26 +48,6 @@ public static class TransactionImport
         return new(valid, issues, ignored);
     }
 
-    public static string? DetectBrand(string code, string name)
-    {
-        var n = Rules.Normalize(name);
-        if (code.StartsWith("106", StringComparison.Ordinal)) return "Fikores";
-        if (code.StartsWith("108", StringComparison.Ordinal)) return "پیکشن";
-        if (code.StartsWith("115", StringComparison.Ordinal) || code.StartsWith("145", StringComparison.Ordinal)) return "2080";
-        if (code.StartsWith("118", StringComparison.Ordinal)) return "سالومه";
-        if (code.StartsWith("128", StringComparison.Ordinal)) return "مکسی بل";
-        if (code.StartsWith("137", StringComparison.Ordinal)) return "پلیس";
-        if (code.StartsWith("147", StringComparison.Ordinal)) return "سوپکس";
-        if (code.StartsWith("161", StringComparison.Ordinal)) return "پانته‌آ";
-        if (code.StartsWith("162", StringComparison.Ordinal)) return "Blue Night";
-        if (code.StartsWith("112", StringComparison.Ordinal))
-        {
-            if (n.Contains("بیوتی نام")) return "بیوتی نام";
-            if (n.Contains("آذر بیوتی") || n.Contains("آذربیوتی")) return "آذر بیوتی";
-        }
-        return null;
-    }
-
     static string Hash(string file)
     {
         using var stream = File.OpenRead(file); return Convert.ToHexString(SHA256.HashData(stream));

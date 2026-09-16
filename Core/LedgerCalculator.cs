@@ -40,6 +40,7 @@ public static class LedgerCalculator
         foreach (var opening in ledger.OpeningLots) Rules.Validate(opening);
         var brandNames = ledger.Brands.Select(x => Rules.Normalize(x.Name)).ToHashSet();
         if (brandNames.Count != ledger.Brands.Count) throw new InvalidDataException("نام برند تکراری است.");
+        BrandPrefixRules.ValidateUnique(ledger.Brands);
         if (ledger.Items.Any(x => !brandNames.Contains(Rules.Normalize(x.Brand)))) throw new InvalidDataException("برای یکی از کالاها تنظیمات برند ثبت نشده است.");
         var itemByCode = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         if (itemByCode.Count != ledger.Items.Count) throw new InvalidDataException("کد کالا تکراری است.");

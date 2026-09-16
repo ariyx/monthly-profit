@@ -28,7 +28,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -48,7 +48,7 @@ public partial class MainWindow : Window
     }
     void Reload(string? key = null)
     {
-        ledger = store.LoadLedger(); var keys = store.Keys();
+        ledger = BrandPrefixRules.AddInitialPrefixes(store.LoadLedger()); var keys = store.Keys();
         if (keys.Count == 0) { store.EnsureMonth(CurrentMonth()); keys = store.Keys(); }
         loading = true; var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string; var selected = Months.SelectedItem as string;
         Months.ItemsSource = keys; Months.SelectedItem = key != null && keys.Contains(key) ? key : selected != null && keys.Contains(selected) ? selected : keys.First();
@@ -115,6 +115,7 @@ public partial class MainWindow : Window
         var d = new BrandManagerDialog(ledger.Brands) { Owner = this }; if (d.ShowDialog() != true || d.Value == null) return;
         Guard(() =>
         {
+            BrandPrefixRules.ValidateUnique(d.Value);
             var names = d.Value.Select(x => Rules.Normalize(x.Name)).ToHashSet(); var used = ledger.Items.Select(x => Rules.Normalize(x.Brand)).Distinct().Where(x => !names.Contains(x)).ToList();
             if (used.Count > 0) throw new InvalidDataException("برندهای استفاده‌شده قابل حذف یا تغییر نام نیستند: " + string.Join("، ", used));
             SaveLedger(ledger with { Brands = d.Value }, "تنظیمات برندها ذخیره شد");
@@ -247,8 +248,9 @@ public partial class MainWindow : Window
 
     Dictionary<string, CatalogItem> ResolveImportItems(ref Ledger state, List<ImportedTransaction> rows)
     {
+        state = BrandPrefixRules.AddInitialPrefixes(state);
         var result = state.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var unknown = rows.Where(x => !result.ContainsKey(x.Code) && TransactionImport.DetectBrand(x.Code, x.Name) == null).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+        var unknown = rows.Where(x => !result.ContainsKey(x.Code) && BrandPrefixRules.Detect(state.Brands, x.Code) == null).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
             .Select(x => new UnknownBrandCandidate(x.Key, x.First().Name)).ToList();
         Dictionary<string, string> manual = new(StringComparer.OrdinalIgnoreCase);
         if (unknown.Count > 0)
@@ -261,7 +263,7 @@ public partial class MainWindow : Window
         foreach (var row in rows)
         {
             if (result.ContainsKey(row.Code)) continue;
-            var brandName = TransactionImport.DetectBrand(row.Code, row.Name) ?? manual[row.Code];
+            var brandName = BrandPrefixRules.Detect(brands, row.Code)?.Name ?? manual[row.Code];
             var profile = brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brandName));
             if (profile == null) { profile = new Brand { Name = Rules.Normalize(brandName) }; brands.Add(profile); }
             result[row.Code] = new CatalogItem { Code = row.Code, Name = row.Name, Brand = profile.Name };
@@ -313,7 +315,7 @@ public partial class MainWindow : Window
     void DrawBrandSettings()
     {
         BrandSettingsGrid.ItemsSource = ledger.Brands.OrderBy(x => x.Name).Select(x => new BrandSettingsRow(x)).ToList();
-        BrandSummary.Text = $"{ledger.Brands.Count} برند فعال؛ درصدها برای ثبت‌های دستی و محاسبه سهم نقدی/چکی استفاده می‌شوند.";
+        BrandSummary.Text = $"{ledger.Brands.Count} برند فعال؛ پیشوند کد، برند کالاهای واردشده را تعیین می‌کند و درصدها برای ثبت‌های دستی و محاسبه سهم نقدی/چکی استفاده می‌شوند.";
     }
     List<ItemMonthRow> ItemRows()
     {
@@ -406,7 +408,7 @@ public sealed class ReconciliationGridRow(ReconciliationCandidate value)
 }
 public sealed class BrandSettingsRow(Brand brand)
 {
-    public string Name => brand.Name; public string PurchaseDiscountText => Rules.Percent(brand.PurchaseDiscount); public string OfferText => Rules.Percent(brand.Offer); public string MarkupText => Rules.Percent(brand.Markup);
+    public string Name => brand.Name; public string Prefixes => BrandPrefixRules.Display(brand.CodePrefixes); public string PurchaseDiscountText => Rules.Percent(brand.PurchaseDiscount); public string OfferText => Rules.Percent(brand.Offer); public string MarkupText => Rules.Percent(brand.Markup);
     public string CashShareText => Rules.Percent(brand.CashShare); public string CreditShareText => Rules.Percent(brand.CreditShare); public string CashDiscountText => Rules.Percent(brand.CashDiscount);
 }
 public sealed class BrandRow(string brand, int count, decimal sales, decimal profit, decimal shortage)

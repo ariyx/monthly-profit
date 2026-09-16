@@ -34,6 +34,10 @@ try
     var range = Path.Combine(root, "range.xlsx"); ExcelTransfer.ExportRange([sample, mixed], range); using (var archive = ZipFile.OpenRead(range)) Equal(archive.GetEntry("xl/worksheets/sheet1.xml") is not null, true, "range Excel output");
     var duplicate = sample with { Products = [p, p with { Id = Guid.NewGuid().ToString() }] }; Throws(() => db.Save(duplicate), "duplicate brand-product pair");
     var brand = new Brand { Name = "Fikores", Markup = .20m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m };
+    var migratedBrands = BrandPrefixRules.AddInitialPrefixes(new Ledger { Brands = [brand] }).Brands;
+    Equal(BrandPrefixRules.Detect(migratedBrands, "1061342")?.Name, "Fikores", "brand prefix maps all 106 codes");
+    Equal(BrandPrefixRules.Display(BrandPrefixRules.Parse("115، 145")), "115، 145", "brand prefix editor parsing");
+    Throws(() => BrandPrefixRules.ValidateUnique([brand with { CodePrefixes = ["106"] }, new Brand { Name = "Other", CodePrefixes = ["106"] }]), "duplicate prefix across brands");
     var item = new CatalogItem { Code = "1060395", Name = "کالای آزمایشی", Brand = brand.Name };
     var ledger = new Ledger
     {

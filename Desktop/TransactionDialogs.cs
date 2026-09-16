@@ -34,6 +34,7 @@ public sealed class BrandManagerDialog : Window
     {
         public required Brand Value { get; init; }
         public string Name => Value.Name;
+        public string Prefixes => BrandPrefixRules.Display(Value.CodePrefixes);
         public string PurchaseDiscount => Rules.Percent(Value.PurchaseDiscount);
         public string Offer => Rules.Percent(Value.Offer);
         public string Markup => Rules.Percent(Value.Markup);
@@ -46,11 +47,12 @@ public sealed class BrandManagerDialog : Window
     public List<Brand>? Value { get; private set; }
     public BrandManagerDialog(IEnumerable<Brand> source)
     {
-        Title = "مدیریت برندها"; Width = 920; Height = 600; MinWidth = 760; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "مدیریت برندها"; Width = 1020; Height = 600; MinWidth = 820; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir"); brands = source.OrderBy(x => x.Name).ToList();
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("مدیریت برندها", "درصدهای هر برند برای فروش‌های بعدی همان برند استفاده می‌شوند."));
+        root.Children.Add(DialogUi.Header("مدیریت برندها", "پیشوند کد، برند کالاهای ورودی را تعیین می‌کند؛ درصدها برای ثبت‌های بعدی همان برند استفاده می‌شوند."));
         grid.AutoGenerateColumns = false; grid.Margin = new Thickness(22); grid.Columns.Add(new DataGridTextColumn { Header = "برند", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1.35, DataGridLengthUnitType.Star) });
+        grid.Columns.Add(new DataGridTextColumn { Header = "پیشوند کد", Binding = new System.Windows.Data.Binding("Prefixes"), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
         grid.Columns.Add(new DataGridTextColumn { Header = "تخفیف خرید٪", Binding = new System.Windows.Data.Binding("PurchaseDiscount"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
         grid.Columns.Add(new DataGridTextColumn { Header = "آفر٪", Binding = new System.Windows.Data.Binding("Offer"), Width = new DataGridLength(.7, DataGridLengthUnitType.Star) });
         grid.Columns.Add(new DataGridTextColumn { Header = "سود٪", Binding = new System.Windows.Data.Binding("Markup"), Width = new DataGridLength(.7, DataGridLengthUnitType.Star) });
@@ -75,15 +77,17 @@ public sealed class BrandEditorDialog : Window
     public Brand? Value { get; private set; }
     public BrandEditorDialog(Brand? brand)
     {
-        Title = brand == null ? "افزودن برند" : "ویرایش برند"; Width = 520; Height = 650; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = brand == null ? "افزودن برند" : "ویرایش برند"; Width = 520; Height = 710; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
         panel.Children.Add(DialogUi.Label("نام برند")); var name = DialogUi.Input(brand?.Name ?? ""); panel.Children.Add(name);
+        panel.Children.Add(DialogUi.Label("پیشوند کد کالا")); var prefixes = DialogUi.Input(BrandPrefixRules.Display(brand?.CodePrefixes ?? [])); prefixes.ToolTip = "مثال: 106 یا 115، 145"; panel.Children.Add(prefixes);
+        panel.Children.Add(new TextBlock { Text = "هر پیشوند را فقط با رقم وارد کنید؛ چند پیشوند را با «،» جدا کنید. مثلاً 106 همهٔ کدهای شروع‌شونده با 106 را به این برند متصل می‌کند.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, Margin = new Thickness(0, -3, 0, 7) });
         var inputs = new Dictionary<string, TextBox>();
         void Rate(string key, string label, decimal value) { panel.Children.Add(DialogUi.Label(label)); var t = DialogUi.Input(); DialogUi.Percent(t, value); inputs[key] = t; panel.Children.Add(t); }
         Rate("discount", "تخفیف خرید ٪", brand?.PurchaseDiscount ?? 0); Rate("offer", "آفر خرید ٪", brand?.Offer ?? 0); Rate("markup", "سود / مارک‌آپ ٪", brand?.Markup ?? .04m); Rate("cash", "سهم فروش نقدی ٪", brand?.CashShare ?? .30m); Rate("credit", "سهم فروش چکی ٪", brand?.CreditShare ?? .70m); Rate("cashdiscount", "تخفیف نقدی ٪", brand?.CashDiscount ?? .05m);
         var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error); var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(save);
-        save.Click += (_, _) => { try { Value = new Brand { Name = Rules.Normalize(name.Text), PurchaseDiscount = DialogUi.Percent(inputs["discount"]), Offer = DialogUi.Percent(inputs["offer"]), Markup = DialogUi.Percent(inputs["markup"]), CashShare = DialogUi.Percent(inputs["cash"]), CreditShare = DialogUi.Percent(inputs["credit"]), CashDiscount = DialogUi.Percent(inputs["cashdiscount"]) }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        save.Click += (_, _) => { try { Value = new Brand { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text), PurchaseDiscount = DialogUi.Percent(inputs["discount"]), Offer = DialogUi.Percent(inputs["offer"]), Markup = DialogUi.Percent(inputs["markup"]), CashShare = DialogUi.Percent(inputs["cash"]), CreditShare = DialogUi.Percent(inputs["credit"]), CashDiscount = DialogUi.Percent(inputs["cashdiscount"]) }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
     }
 }
 
@@ -156,14 +160,37 @@ public sealed class UnknownBrandDialog : Window
         Title = "تعیین برند کالاهای ناشناخته"; Width = 900; Height = 600; MinWidth = 700; MinHeight = 440; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         rows = candidates.Select(x => new Row { Candidate = x }).ToList();
-        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("تعیین برند کالاهای ناشناخته", "برای هر کد یک برند بنویسید. نام جدید به‌عنوان برند جدید با درصدهای پیش‌فرض ساخته می‌شود."));
-        var grid = new DataGrid { AutoGenerateColumns = false, Margin = new Thickness(22), ItemsSource = rows, CanUserAddRows = false };
-        grid.Columns.Add(new DataGridTextColumn { Header = "کد کالا", Binding = new System.Windows.Data.Binding("Code"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "نام کالا", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(2.5, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "برند", Binding = new System.Windows.Data.Binding("Brand") { Mode = System.Windows.Data.BindingMode.TwoWay, UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged }, Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
-        Grid.SetRow(grid, 1); root.Children.Add(grid);
-        var footer = new StackPanel { Margin = new Thickness(22, 0, 22, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer); footer.Children.Add(error);
+        DataGrid? grid = null;
+        var quickAssign = new StackPanel { Margin = new Thickness(22, 14, 22, 0), Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        quickAssign.Children.Add(new TextBlock { Text = "برای هر ردیف نام برند را در کادر سفید تایپ کنید. ", VerticalAlignment = VerticalAlignment.Center, Foreground = new SolidColorBrush(Color.FromRgb(82, 98, 124)) });
+        var defaultBrand = new TextBox { Width = 220, MinHeight = 32, TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.RightToLeft, Padding = new Thickness(8, 4, 8, 4), ToolTip = "برند پیش‌فرض برای ردیف‌های خالی" };
+        quickAssign.Children.Add(defaultBrand);
+        var applyDefault = new Button { Content = "اعمال برای ردیف‌های خالی", Margin = new Thickness(8, 0, 0, 0) };
+        quickAssign.Children.Add(applyDefault);
+        applyDefault.Click += (_, _) =>
+        {
+            var value = Rules.Normalize(defaultBrand.Text);
+            if (value.Length == 0) return;
+            foreach (var row in rows.Where(x => string.IsNullOrWhiteSpace(x.Brand))) row.Brand = value;
+            grid?.Items.Refresh();
+        };
+        Grid.SetRow(quickAssign, 1); root.Children.Add(quickAssign);
+
+        grid = new DataGrid { AutoGenerateColumns = false, Margin = new Thickness(22), ItemsSource = rows, CanUserAddRows = false };
+        grid.Columns.Add(new DataGridTextColumn { Header = "کد کالا", Binding = new System.Windows.Data.Binding("Code"), Width = new DataGridLength(1, DataGridLengthUnitType.Star), IsReadOnly = true });
+        grid.Columns.Add(new DataGridTextColumn { Header = "نام کالا", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(2.5, DataGridLengthUnitType.Star), IsReadOnly = true });
+        var brandCell = new FrameworkElementFactory(typeof(TextBox));
+        brandCell.SetValue(TextBox.MinHeightProperty, 32d);
+        brandCell.SetValue(TextBox.TextAlignmentProperty, TextAlignment.Right);
+        brandCell.SetValue(FrameworkElement.FlowDirectionProperty, FlowDirection.RightToLeft);
+        brandCell.SetValue(Control.PaddingProperty, new Thickness(8, 4, 8, 4));
+        brandCell.SetValue(FrameworkElement.MarginProperty, new Thickness(5, 3, 5, 3));
+        brandCell.SetBinding(TextBox.TextProperty, new System.Windows.Data.Binding("Brand") { Mode = System.Windows.Data.BindingMode.TwoWay, UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged });
+        grid.Columns.Add(new DataGridTemplateColumn { Header = "برند (قابل تایپ)", CellTemplate = new DataTemplate { VisualTree = brandCell }, Width = new DataGridLength(1.5, DataGridLengthUnitType.Star) });
+        Grid.SetRow(grid, 2); root.Children.Add(grid);
+        var footer = new StackPanel { Margin = new Thickness(22, 0, 22, 18) }; Grid.SetRow(footer, 3); root.Children.Add(footer); footer.Children.Add(error);
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right }; footer.Children.Add(actions); var cancel = new Button { Content = "انصراف" }; var save = new Button { Content = "تأیید برندها", Style = (Style)FindResource("Primary") }; actions.Children.Add(cancel); actions.Children.Add(save);
         cancel.Click += (_, _) => DialogResult = false;
         save.Click += (_, _) =>

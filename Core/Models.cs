@@ -59,12 +59,55 @@ public sealed record Preferences
 public sealed record Brand
 {
     public string Name { get; init; } = "";
+    // هر مورد فقط رقم است؛ برای نمونه «106». چند پیشوند برای یک برند مجاز است.
+    public List<string> CodePrefixes { get; init; } = [];
     public decimal PurchaseDiscount { get; init; }
     public decimal Offer { get; init; }
     public decimal Markup { get; init; } = .04m;
     public decimal CreditShare { get; init; } = .70m;
     public decimal CashShare { get; init; } = .30m;
     public decimal CashDiscount { get; init; } = .05m;
+}
+
+public static class BrandPrefixRules
+{
+    // این‌ها فقط برای انتقال داده‌های نسخه‌های قبل به تنظیمات قابل‌ویرایش برند هستند.
+    // تشخیص در زمان ورود، تنها از CodePrefixes ذخیره‌شده در خود برند استفاده می‌کند.
+    static readonly IReadOnlyDictionary<string, string[]> InitialPrefixes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+    {
+        ["Fikores"] = ["106"], ["پیکشن"] = ["108"], ["2080"] = ["115", "145"], ["سالومه"] = ["118"],
+        ["مکسی بل"] = ["128"], ["پلیس"] = ["137"], ["سوپکس"] = ["147"], ["پانته‌آ"] = ["161"], ["Blue Night"] = ["162"]
+    };
+
+    public static List<string> Parse(string? value) => (value ?? "").Split([',', '،', ';', '؛', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .Select(Rules.Digits).Where(x => x.Length > 0).Distinct(StringComparer.Ordinal).ToList();
+    public static string Display(IEnumerable<string> prefixes) => string.Join("، ", prefixes);
+
+    public static Brand? Detect(IEnumerable<Brand> brands, string code)
+    {
+        var normalizedCode = Rules.Digits(code);
+        return brands.SelectMany(brand => brand.CodePrefixes.Select(prefix => (Brand: brand, Prefix: Rules.Digits(prefix))))
+            .Where(x => x.Prefix.Length > 0 && normalizedCode.StartsWith(x.Prefix, StringComparison.Ordinal))
+            .OrderByDescending(x => x.Prefix.Length).Select(x => x.Brand).FirstOrDefault();
+    }
+
+    public static void ValidateUnique(IEnumerable<Brand> brands)
+    {
+        var duplicate = brands.SelectMany(brand => brand.CodePrefixes.Select(prefix => (Prefix: Rules.Digits(prefix), Brand: Rules.Normalize(brand.Name))))
+            .Where(x => x.Prefix.Length > 0).GroupBy(x => x.Prefix).FirstOrDefault(x => x.Select(y => y.Brand).Distinct().Count() > 1);
+        if (duplicate != null) throw new InvalidDataException("پیشوند کد «" + duplicate.Key + "» برای بیش از یک برند ثبت شده است.");
+    }
+
+    public static Ledger AddInitialPrefixes(Ledger ledger)
+    {
+        var changed = false;
+        var brands = ledger.Brands.Select(brand =>
+        {
+            if (brand.CodePrefixes.Count > 0 || !InitialPrefixes.TryGetValue(brand.Name, out var defaults)) return brand;
+            changed = true; return brand with { CodePrefixes = [.. defaults] };
+        }).ToList();
+        return changed ? ledger with { Brands = brands } : ledger;
+    }
 }
 
 public sealed record CatalogItem
@@ -245,6 +288,8 @@ public static class Rules
     public static void Validate(Brand b)
     {
         if (string.IsNullOrWhiteSpace(b.Name) || b.Name.Trim().Length > 120) throw new InvalidDataException("نام برند نامعتبر است.");
+        if (b.CodePrefixes.Any(x => x.Length < 2 || x.Length > 12 || !x.All(char.IsDigit))) throw new InvalidDataException("پیشوند کد برند باید فقط رقم و بین ۲ تا ۱۲ رقم باشد.");
+        if (b.CodePrefixes.Select(Rules.Digits).Distinct(StringComparer.Ordinal).Count() != b.CodePrefixes.Count) throw new InvalidDataException("پیشوند کد در یک برند تکراری است.");
         if (new[] { b.PurchaseDiscount, b.Offer, b.Markup, b.CreditShare, b.CashShare, b.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای برند باید بین صفر و ۱۰۰ باشند.");
         if (b.PurchaseDiscount + b.Offer > 1) throw new InvalidDataException("جمع تخفیف خرید و آفر نباید از ۱۰۰٪ بیشتر باشد.");
         if (b.CashShare + b.CreditShare != 1) throw new InvalidDataException("جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.");
