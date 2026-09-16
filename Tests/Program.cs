@@ -58,6 +58,8 @@ try
     var reconciliation = ReconciliationPlanner.Find(ledger, [new Sale { Id = "s3", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }]);
     Equal(reconciliation.Count, 1, "reconciliation groups shortages by code"); Equal(reconciliation[0].Quantity, 2m, "reconciliation quantity");
     var adjustments = ReconciliationPlanner.CreateAdjustments(reconciliation, new Dictionary<string, decimal> { [item.Code] = 200m });
+    var partialAdjustment = ReconciliationPlanner.CreateAdjustments([reconciliation[0] with { Quantity = 1m }], new Dictionary<string, decimal> { [item.Code] = 200m });
+    Equal(partialAdjustment.Single().Quantity, 1m, "partial reconciliation adjustment is retained");
     var reconciledLedger = ledger with { Purchases = [.. ledger.Purchases, .. adjustments], Sales = [.. ledger.Sales, new Sale { Id = "s3", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
     Equal(LedgerCalculator.Calculate(reconciledLedger).Sales["s3"].Shortage, 0m, "approved adjustment resolves shortage");
     var withOpening = new Ledger { Brands = [brand], Items = [item], OpeningLots = [new OpeningLot { Id = "o1", Code = item.Code, Quantity = 3, UnitCost = 80, SourceDate = "14041229" }], Sales = [new Sale { Id = "os1", Date = "14050102", Code = item.Code, Quantity = 2, UnitPrice = 200, Total = 400, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
