@@ -249,17 +249,18 @@ public partial class MainWindow : Window
     Dictionary<string, CatalogItem> ResolveImportItems(ref Ledger state, List<ImportedTransaction> rows)
     {
         state = BrandPrefixRules.AddInitialPrefixes(state);
+        var currentBrands = state.Brands;
         var result = state.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var unknown = rows.Where(x => !result.ContainsKey(x.Code) && BrandPrefixRules.Detect(state.Brands, x.Code) == null).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
+        var unknown = rows.Where(x => !result.ContainsKey(x.Code) && BrandPrefixRules.Detect(currentBrands, x.Code) == null).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase)
             .Select(x => new UnknownBrandCandidate(x.Key, x.First().Name)).ToList();
         Dictionary<string, string> manual = new(StringComparer.OrdinalIgnoreCase);
         if (unknown.Count > 0)
         {
-            var dialog = new UnknownBrandDialog(unknown, state.Brands.Select(x => x.Name)) { Owner = this };
+            var dialog = new UnknownBrandDialog(unknown, currentBrands.Select(x => x.Name)) { Owner = this };
             if (dialog.ShowDialog() != true || dialog.Assignments == null) throw new OperationCanceledException();
             manual = dialog.Assignments;
         }
-        var brands = state.Brands.ToList();
+        var brands = currentBrands.ToList();
         foreach (var row in rows)
         {
             if (result.ContainsKey(row.Code)) continue;
