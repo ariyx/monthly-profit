@@ -22,6 +22,16 @@ public static class LedgerCalculator
     sealed record Entry(string Date, int Order, string Id, Purchase? Purchase, Sale? Sale);
 
     public static LedgerCalculation Calculate(Ledger ledger)
+        => Calculate(ledger, null);
+
+    // موجودیِ یک ماه باید تا پایان همان ماه محاسبه شود، نه با خرید و فروش ماه‌های بعد.
+    public static LedgerCalculation CalculateAtEndOfMonth(Ledger ledger, string monthKey)
+    {
+        if (!Rules.ValidMonth(monthKey)) throw new InvalidDataException("ماه نامعتبر است.");
+        return Calculate(ledger, monthKey.Replace("/", "") + "31");
+    }
+
+    static LedgerCalculation Calculate(Ledger ledger, string? throughDate)
     {
         foreach (var brand in ledger.Brands) Rules.Validate(brand);
         foreach (var item in ledger.Items) Rules.Validate(item);
@@ -37,8 +47,8 @@ public static class LedgerCalculator
 
         var result = new LedgerCalculation();
         var lots = new List<Lot>();
-        var entries = ledger.Purchases.Select(x => new Entry(x.Date, 0, x.Id, x, null))
-            .Concat(ledger.Sales.Select(x => new Entry(x.Date, 1, x.Id, null, x)))
+        var entries = ledger.Purchases.Where(x => throughDate == null || string.CompareOrdinal(x.Date, throughDate) <= 0).Select(x => new Entry(x.Date, 0, x.Id, x, null))
+            .Concat(ledger.Sales.Where(x => throughDate == null || string.CompareOrdinal(x.Date, throughDate) <= 0).Select(x => new Entry(x.Date, 1, x.Id, null, x)))
             .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Order).ThenBy(x => x.Id, StringComparer.Ordinal);
         lots.AddRange(ledger.OpeningLots.Select(x => new Lot(x)));
         foreach (var entry in entries)
@@ -68,7 +78,12 @@ public static class LedgerCalculator
         var settled = sales.Select(x => calculation.Sales[x.Id]).ToList();
         var codes = sales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var items = ledger.Items.Where(x => codes.Contains(x.Code, StringComparer.OrdinalIgnoreCase)).ToList();
-        return new LedgerTotal(settled.Sum(x => x.Cost), settled.Sum(x => x.Cash), settled.Sum(x => x.Credit), settled.Sum(x => x.Profit), month.FixedCost, sales.Sum(x => x.Quantity), codes.Count, items.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+        return new LedgerTotal(settled.Sum(x => x.Cost), settled.Sum(x => x.Cash), settled.Sum(x => x.Credit), settled.Sum(x => x.Profit), month.FixedCost, sales.Sum(x => x.Quantity), codes.Count, items.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase).Count())
+        {
+            InvoiceSales = sales.Sum(Rules.NetSaleBase),
+            CashDiscountAmount = sales.Sum(Rules.CashDiscountAmount),
+            Shortage = settled.Sum(x => x.Shortage)
+        };
     }
 
     public static SaleSettlement PreviewSale(Ledger ledger, Sale sale)

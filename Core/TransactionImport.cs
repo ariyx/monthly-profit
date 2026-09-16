@@ -30,11 +30,12 @@ public static class TransactionImport
                 string Value(string name) => cells.GetValueOrDefault(Header(name), "");
                 var unitText = Value("قیمت"); var totalText = Value("قیمت کل");
                 // آفر/تستر با قیمت یک یا دو رقمی و ردیف‌های بدون مبلغ، وارد گردش واقعی نمی‌شوند.
-                if (string.IsNullOrWhiteSpace(unitText) || string.IsNullOrWhiteSpace(totalText)) { ignored++; continue; }
-                var unit = Rules.Number(unitText); var total = Rules.Number(totalText);
+                if (string.IsNullOrWhiteSpace(unitText)) { ignored++; continue; }
+                var quantity = Rules.Number(string.IsNullOrWhiteSpace(Value("تعداد واحد اصلی")) ? Value("تعداد") : Value("تعداد واحد اصلی"));
+                var unit = Rules.Number(unitText); var total = string.IsNullOrWhiteSpace(totalText) ? quantity * unit : Rules.Number(totalText);
                 if (unit <= 99 || total <= 99) { ignored++; continue; }
                 var date = Rules.Digits(Value("تاریخ")); var code = Rules.Normalize(Value("کد کالا")); var name = Rules.Normalize(Value("نام کالا"));
-                var account = Rules.Normalize(Value("نام حساب")); var quantity = Rules.Number(Value("تعداد واحد اصلی"));
+                var account = Rules.Normalize(Value("نام حساب"));
                 var deductionsText = Value("کسورات"); var deductions = string.IsNullOrWhiteSpace(deductionsText) ? 0m : Rules.Number(deductionsText);
                 if (!Rules.ValidDate(date) || string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name) || quantity <= 0 || total - deductions < 0) throw new InvalidDataException("ستون‌های اجباری ردیف نامعتبر هستند.");
                 valid.Add(new ImportedTransaction(number, hash + ":" + number, date, code, name, account, quantity, unit, total, deductions));

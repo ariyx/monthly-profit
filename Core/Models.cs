@@ -138,6 +138,10 @@ public sealed record StockRow(string Code, string Name, string Brand, decimal Qu
 public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, decimal Profit, decimal FixedCost, decimal Quantity, int Products, int Brands)
 {
     public decimal Sales => Cash + Credit;
+    // مبلغ فاکتور پس از کسورات، پیش از کسر تخفیف نقدی.
+    public decimal InvoiceSales { get; init; }
+    public decimal CashDiscountAmount { get; init; }
+    public decimal Shortage { get; init; }
     public decimal Net => Profit - FixedCost;
     public decimal? Margin => Sales == 0 ? null : Profit / Sales;
 }
@@ -230,6 +234,7 @@ public static class Rules
     }
     public static decimal NetPurchase(Purchase p) => p.Total - p.Deductions - (p.Total * p.BrandDiscount) - (p.Total * p.Offer);
     public static decimal NetSaleBase(Sale s) => s.Total - s.Deductions;
+    public static decimal CashDiscountAmount(Sale s) => NetSaleBase(s) * s.CashShare * s.CashDiscount;
     public static (decimal Cash, decimal Credit) SplitSale(Sale s)
     {
         var baseSale = NetSaleBase(s);
