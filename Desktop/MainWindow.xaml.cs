@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     bool loading;
     Preferences preferences = new();
     List<Month> reportMonths = [];
+    List<ReconciliationCandidate> reconciliationCandidates = [];
     string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonthlyProfit", "Data");
 
     public MainWindow()
@@ -28,7 +29,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۲ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -139,31 +140,33 @@ public partial class MainWindow : Window
     }
     void AddSaleWithReconciliation(Sale sale, string action)
     {
-        var preview = LedgerCalculator.PreviewSale(ledger, sale); var next = ledger;
-        if (preview.Shortage > 0)
-        {
-            var item = ledger.Items.Single(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase));
-            var latest = ledger.Purchases.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).FirstOrDefault();
-            if (MessageBox.Show(this, $"برای «{item.Name}» مقدار {Rules.Money(preview.Shortage)} کسری موجودی وجود دارد. تعدیل دستی درست پیش از فروش ثبت شود؟", "مغایرت موجودی", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) throw new OperationCanceledException();
-            var suggested = latest?.UnitPrice ?? ledger.OpeningLots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.SourceDate).Select(x => x.UnitCost).FirstOrDefault();
-            var adjustment = new PurchaseDialog(ledger, true, item.Code, preview.Shortage, suggested, sale.Date) { Owner = this };
-            if (adjustment.ShowDialog() != true || adjustment.Value == null || adjustment.Item == null) throw new OperationCanceledException();
-            var items = ledger.Items.ToList(); if (!items.Any(x => x.Code.Equals(adjustment.Item.Code, StringComparison.OrdinalIgnoreCase))) items.Add(adjustment.Item);
-            next = ledger with { Items = items, Purchases = [.. ledger.Purchases, adjustment.Value] };
-        }
-        SaveLedger(next with { Sales = [.. next.Sales, sale] }, action, Rules.MonthOf(sale.Date));
+        // فروش بدون وقفه ثبت می‌شود؛ هر کسری بعداً و به‌صورت قابل جست‌وجو در تب مغایرت‌ها تعیین تکلیف خواهد شد.
+        SaveLedger(ledger with { Sales = [.. ledger.Sales, sale] }, action + "؛ مغایرت احتمالی در تب مغایرت‌ها قابل بررسی است.", Rules.MonthOf(sale.Date));
     }
-    void ResolveReconciliations(object s, RoutedEventArgs e)
+
+    void OpenReconciliations(object s, RoutedEventArgs e)
+    {
+        MainTabs.SelectedIndex = 4;
+        ReconciliationSearch.Focus();
+    }
+    void ReconciliationSearchChanged(object s, TextChangedEventArgs e) => ApplyReconciliationFilter();
+    void ClearReconciliationSearch(object s, RoutedEventArgs e) => ReconciliationSearch.Text = "";
+    void ReconciliationSelectionChanged(object s, SelectionChangedEventArgs e)
+    {
+        if (ReconciliationsGrid.SelectedItem is ReconciliationGridRow row)
+            ReconciliationUnitCost.Text = row.Candidate.SuggestedUnitCost > 0 ? Rules.Money(row.Candidate.SuggestedUnitCost) : "";
+    }
+    void ConfirmSelectedReconciliation(object s, RoutedEventArgs e)
     {
         Guard(() =>
         {
-            var candidates = ReconciliationPlanner.Existing(ledger);
-            if (candidates.Count == 0) { MessageBox.Show(this, "مغایرت تأییدنشده‌ای وجود ندارد.", "کنترل مغایرت"); return; }
-            foreach (var candidate in candidates) if (!CanEdit(Rules.MonthOf(candidate.FirstDate))) throw new InvalidOperationException($"ماه {Rules.MonthOf(candidate.FirstDate)} بسته است؛ ابتدا آن را باز کنید.");
-            var dialog = new ReconciliationDialog(candidates) { Owner = this };
-            if (dialog.ShowDialog() != true || dialog.UnitCosts == null) return;
-            var adjustments = ReconciliationPlanner.CreateAdjustments(candidates, dialog.UnitCosts);
-            SaveLedger(ledger with { Purchases = [.. ledger.Purchases, .. adjustments] }, $"{adjustments.Count} تعدیل موجودی ثبت شد");
+            if (ReconciliationsGrid.SelectedItem is not ReconciliationGridRow row) throw new InvalidOperationException("ابتدا یک مغایرت را از جدول انتخاب کنید.");
+            var candidate = row.Candidate;
+            if (!CanEdit(Rules.MonthOf(candidate.FirstDate))) throw new InvalidOperationException($"ماه {Rules.MonthOf(candidate.FirstDate)} بسته است؛ ابتدا آن را باز کنید.");
+            var unitCost = Rules.Number(ReconciliationUnitCost.Text);
+            if (unitCost <= 0) throw new InvalidDataException("قیمت واحد تعدیل باید بیشتر از صفر باشد.");
+            var adjustments = ReconciliationPlanner.CreateAdjustments([candidate], new Dictionary<string, decimal> { [candidate.Code] = unitCost });
+            SaveLedger(ledger with { Purchases = [.. ledger.Purchases, .. adjustments] }, $"مغایرت کد {candidate.Code} تأیید و تعدیل شد", Rules.MonthOf(candidate.FirstDate));
         });
     }
     void ImportPurchases(object s, RoutedEventArgs e) => ImportTransactions(TransactionKind.Purchase);
@@ -233,17 +236,9 @@ public partial class MainWindow : Window
                 var item = items[row.Code]; var profile = staged.Brands.Single(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand));
                 return new Sale { Date = row.Date, Code = item.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount, ImportKey = row.ImportKey };
             }).ToList();
-            var candidates = ReconciliationPlanner.Find(staged, sales);
-            if (candidates.Count > 0)
-            {
-                var dialog = new ReconciliationDialog(candidates) { Owner = this };
-                if (dialog.ShowDialog() != true || dialog.UnitCosts == null) throw new OperationCanceledException();
-                var adjustments = ReconciliationPlanner.CreateAdjustments(candidates, dialog.UnitCosts);
-                staged = staged with { Purchases = [.. staged.Purchases, .. adjustments] };
-            }
             staged = staged with { Sales = [.. staged.Sales, .. sales], ImportedRows = [.. staged.ImportedRows, .. rows.Select(x => x.ImportKey)] };
         }
-        SaveLedger(staged, (kind == TransactionKind.Purchase ? "خریدهای اکسل" : "فروش‌های اکسل") + " وارد شدند", Rules.MonthOf(rows.MaxBy(x => x.Date)!.Date));
+        SaveLedger(staged, kind == TransactionKind.Purchase ? "خریدهای اکسل وارد شدند" : "فروش‌های اکسل وارد شدند؛ مغایرت‌های احتمالی در تب مغایرت‌ها آمادهٔ بررسی هستند.", Rules.MonthOf(rows.MaxBy(x => x.Date)!.Date));
     }
 
     Dictionary<string, CatalogItem> ResolveImportItems(ref Ledger state, List<ImportedTransaction> rows)
@@ -308,9 +303,18 @@ public partial class MainWindow : Window
 
     void DrawReconciliations()
     {
-        var rows = ReconciliationPlanner.Existing(ledger).Select(x => new ReconciliationGridRow(x)).ToList();
-        ReconciliationsGrid.ItemsSource = rows;
-        ReconciliationSummary.Text = rows.Count == 0 ? "همه فروش‌ها با موجودی قابل‌ردیابی پوشش داده شده‌اند." : $"{rows.Count} کد کالا، در مجموع {Rules.Money(rows.Sum(x => x.Quantity))} عدد کسری دارد. تا تعیین تکلیف، سود قطعی نیست.";
+        reconciliationCandidates = ReconciliationPlanner.Existing(ledger);
+        ApplyReconciliationFilter();
+        ReconciliationSummary.Text = reconciliationCandidates.Count == 0 ? "همه فروش‌ها با موجودی قابل‌ردیابی پوشش داده شده‌اند." : $"{reconciliationCandidates.Count} کد کالا، در مجموع {Rules.Money(reconciliationCandidates.Sum(x => x.Quantity))} عدد کسری دارد. کد، کالا یا برند را جست‌وجو کنید؛ سپس یک ردیف را انتخاب و قیمت تعدیل را ثبت کنید.";
+    }
+    void ApplyReconciliationFilter()
+    {
+        if (ReconciliationsGrid == null) return;
+        var needle = Rules.Normalize(ReconciliationSearch?.Text ?? "");
+        var visible = reconciliationCandidates.Where(x => needle.Length == 0 || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            .Select(x => new ReconciliationGridRow(x)).ToList();
+        ReconciliationsGrid.ItemsSource = visible;
+        if (visible.Count == 0) ReconciliationUnitCost.Text = "";
     }
 
     void DrawBrandSettings()
@@ -404,6 +408,7 @@ public sealed class InventoryGridRow(CatalogItem item, decimal opening, decimal 
 }
 public sealed class ReconciliationGridRow(ReconciliationCandidate value)
 {
+    public ReconciliationCandidate Candidate => value;
     public string FirstDate => value.FirstDate; public string Code => value.Code; public string Brand => value.Brand; public string Name => value.Name; public decimal Quantity => value.Quantity; public int SaleRows => value.SaleRows;
     public string QuantityText => Rules.Money(value.Quantity); public string SuggestedText => value.SuggestedUnitCost <= 0 ? "نیازمند ورود دستی" : Rules.Money(value.SuggestedUnitCost);
 }
