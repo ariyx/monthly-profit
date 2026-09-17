@@ -278,7 +278,10 @@ public static class Rules
         return s.Replace("٬", "").Replace(",", "").Replace('٫', '.').Trim();
     }
     public static decimal Number(string s) => decimal.TryParse(Digits(s), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var n) ? n : throw new FormatException("عدد نامعتبر است: " + s);
+    // برای ورودی‌ها و مقدار/تعداد، دقت اصلی حفظ می‌شود. گزارش‌های مالی اما به ریال
+    // نمایش داده می‌شوند و اعشار صرفاً نویزِ محاسباتی است.
     public static string Money(decimal n) => n.ToString("#,##0.##", CultureInfo.InvariantCulture);
+    public static string ReportMoney(decimal n) => decimal.Round(n, 0, MidpointRounding.AwayFromZero).ToString("#,##0", CultureInfo.InvariantCulture);
     public static string Percent(decimal? n) => n.HasValue ? (n.Value * 100).ToString("0.##", CultureInfo.InvariantCulture) + "٪" : "تعریف‌نشده";
     public static bool ValidDate(string value) => value.Length == 8 && value.All(char.IsDigit) && ValidMonth(value[..4] + "/" + value[4..6]) && int.TryParse(value[6..], out var day) && day is >= 1 and <= 31;
     public static string MonthOf(string date)

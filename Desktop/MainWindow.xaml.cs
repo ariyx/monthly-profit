@@ -33,7 +33,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۹ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱۰ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -84,11 +84,11 @@ public partial class MainWindow : Window
     }
     void Draw()
     {
-        var t = LedgerCalculator.SummarizeMonth(ledger, current); Sales.Text = Rules.Money(t.Sales); Profit.Text = Rules.Money(t.Profit); Net.Text = Rules.Money(t.Net);
+        var t = LedgerCalculator.SummarizeMonth(ledger, current); Sales.Text = Rules.ReportMoney(t.Sales); Profit.Text = Rules.ReportMoney(t.Profit); Net.Text = Rules.ReportMoney(t.Net);
         var color = t.Net < 0 ? Brushes.Firebrick : t.Net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; Net.Foreground = color; NetLabel.Text = Outcome(t.Net); NetLabel.Foreground = color;
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.Firebrick : Brushes.SeaGreen;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin); Fixed.Text = Rules.Money(current.FixedCost);
-        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.Money(t.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.Money(t.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.Money(t.Cash)} ریال\nفروش چکی: {Rules.Money(t.Credit)} ریال\nبهای تمام‌شده فروش‌رفته: {Rules.Money(t.Cost)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}" + (t.Shortage > 0 ? $"\nمغایرت تأییدنشده: {Rules.Money(t.Shortage)} عدد؛ سود قطعی نیست." : "");
+        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(t.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(t.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(t.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(t.Credit)} ریال\nبهای تمام‌شده فروش‌رفته: {Rules.ReportMoney(t.Cost)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}" + (t.Shortage > 0 ? $"\nمغایرت تأییدنشده: {Rules.Money(t.Shortage)} عدد؛ سود قطعی نیست." : "");
         DrawTransactions(); DrawInventory(); DrawReconciliations(); DrawPendingBrands(); DrawBrandSettings(); DrawBrands(); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · {ledger.Purchases.Count} خرید و {ledger.Sales.Count} فروش ثبت شده";
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
@@ -201,7 +201,7 @@ public partial class MainWindow : Window
         var visible = purchaseRows.Where(x => (brand == "همه برندها" || x.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase)) &&
             (needle.Length == 0 || x.Supplier.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
         PurchasesGrid.ItemsSource = visible;
-        PurchaseSummary.Text = $"{visible.Count} از {purchaseRows.Count} ردیف · {Rules.Money(visible.Sum(x => x.Value.Quantity))} عدد · بهای خالص خرید: {Rules.Money(visible.Sum(x => Rules.NetPurchase(x.Value)))} ریال";
+        PurchaseSummary.Text = $"{visible.Count} از {purchaseRows.Count} ردیف · {Rules.Money(visible.Sum(x => x.Value.Quantity))} عدد · بهای خالص خرید: {Rules.ReportMoney(visible.Sum(x => Rules.NetPurchase(x.Value)))} ریال";
     }
     void ApplySaleFilter()
     {
@@ -211,7 +211,7 @@ public partial class MainWindow : Window
             (needle.Length == 0 || x.Customer.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
         SalesGrid.ItemsSource = visible;
         var invoice = visible.Sum(x => Rules.NetSaleBase(x.Value)); var discount = visible.Sum(x => Rules.CashDiscountAmount(x.Value)); var sales = visible.Sum(x => x.Settlement.Sales); var cost = visible.Sum(x => x.Settlement.Cost); var shortage = visible.Sum(x => x.Settlement.Shortage);
-        SaleSummary.Text = $"{visible.Count} از {saleRows.Count} ردیف · فروش پس از کسورات: {Rules.Money(invoice)} ریال · تخفیف نقدی: {Rules.Money(discount)} ریال · دریافتی نهایی: {Rules.Money(sales)} ریال · سود ناخالص: {Rules.Money(sales - cost)} ریال" + (shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(shortage)} عدد" : "");
+        SaleSummary.Text = $"{visible.Count} از {saleRows.Count} ردیف · فروش پس از کسورات: {Rules.ReportMoney(invoice)} ریال · تخفیف نقدی: {Rules.ReportMoney(discount)} ریال · دریافتی نهایی: {Rules.ReportMoney(sales)} ریال · سود ناخالص: {Rules.ReportMoney(sales - cost)} ریال" + (shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(shortage)} عدد" : "");
     }
 
     void OpenReconciliations(object s, RoutedEventArgs e)
@@ -416,7 +416,7 @@ public partial class MainWindow : Window
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var rows = codes.Where(items.ContainsKey).Select(code => new InventoryGridRow(items[code], opening.GetValueOrDefault(code)?.Quantity ?? 0, purchases.GetValueOrDefault(code), sales.GetValueOrDefault(code), closing.GetValueOrDefault(code)?.Quantity ?? 0, closing.GetValueOrDefault(code)?.Cost ?? 0)).OrderBy(x => x.Brand).ThenBy(x => x.Code).ToList();
         InventoryGrid.ItemsSource = rows;
-        InventorySummary.Text = $"{rows.Count} کالا · موجودی پایان ماه: {Rules.Money(rows.Sum(x => x.Closing))} عدد · ارزش موجودی: {Rules.Money(rows.Sum(x => x.Cost))} ریال";
+        InventorySummary.Text = $"{rows.Count} کالا · موجودی پایان ماه: {Rules.Money(rows.Sum(x => x.Closing))} عدد · ارزش موجودی: {Rules.ReportMoney(rows.Sum(x => x.Cost))} ریال";
     }
 
     void DrawReconciliations()
@@ -471,7 +471,7 @@ public partial class MainWindow : Window
         var keys = store.Keys(); var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string;
         if (from != null && to != null && string.CompareOrdinal(from, to) > 0) { reportMonths = []; HistoryGrid.ItemsSource = Array.Empty<HistoryRow>(); HistorySummary.Text = "بازه ماه نامعتبر است."; DrawTrend(); return; }
         reportMonths = keys.Where(k => (from == null || k.CompareTo(from) >= 0) && (to == null || k.CompareTo(to) <= 0)).OrderBy(k => k).Select(store.Load).ToList(); var totals = reportMonths.Select(Total).ToList(); HistoryGrid.ItemsSource = reportMonths.OrderByDescending(x => x.Key).Select(x => new HistoryRow(x, Total(x))).ToList();
-        var cost = totals.Sum(x => x.Cost); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit); var fixedCost = totals.Sum(x => x.FixedCost); var net = totals.Sum(x => x.Net); RangeSales.Text = Rules.Money(sales); RangeProfit.Text = Rules.Money(profit); RangeNet.Text = Rules.Money(net); RangeNet.Foreground = net < 0 ? Brushes.Firebrick : net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; RangeOutcome.Text = Outcome(net) + " نهایی"; HistorySummary.Text = reportMonths.Count == 0 ? "در این بازه ماهی ثبت نشده است." : $"{reportMonths.Count} ماه · بهای تمام‌شده: {Rules.Money(cost)} ریال · هزینه ثابت: {Rules.Money(fixedCost)} ریال · حاشیه سود: {Rules.Percent(sales == 0 ? null : profit / sales)}"; DrawTrend();
+        var cost = totals.Sum(x => x.Cost); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit); var fixedCost = totals.Sum(x => x.FixedCost); var net = totals.Sum(x => x.Net); RangeSales.Text = Rules.ReportMoney(sales); RangeProfit.Text = Rules.ReportMoney(profit); RangeNet.Text = Rules.ReportMoney(net); RangeNet.Foreground = net < 0 ? Brushes.Firebrick : net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; RangeOutcome.Text = Outcome(net) + " نهایی"; HistorySummary.Text = reportMonths.Count == 0 ? "در این بازه ماهی ثبت نشده است." : $"{reportMonths.Count} ماه · بهای تمام‌شده: {Rules.ReportMoney(cost)} ریال · هزینه ثابت: {Rules.ReportMoney(fixedCost)} ریال · حاشیه سود: {Rules.Percent(sales == 0 ? null : profit / sales)}"; DrawTrend();
     }
     void TrendFilterChanged(object s, RoutedEventArgs e) => DrawTrend(); void TrendSizeChanged(object s, SizeChangedEventArgs e) => DrawTrend();
     void DrawTrend()
@@ -480,12 +480,12 @@ public partial class MainWindow : Window
         var selected = new List<(string Name, Brush Brush, Func<LedgerTotal, decimal> Get)>(); if (TrendSales.IsChecked == true) selected.Add(("فروش", Brushes.SteelBlue, x => x.Sales)); if (TrendProfit.IsChecked == true) selected.Add(("سود", Brushes.SeaGreen, x => x.Profit)); if (TrendNet.IsChecked == true) selected.Add(("نتیجه", Brushes.Firebrick, x => x.Net)); if (selected.Count == 0) return;
         var totals = reportMonths.Select(Total).ToList(); var values = selected.SelectMany(s => totals.Select(s.Get)).ToList(); var min = Math.Min(0, values.Min()); var max = Math.Max(0, values.Max()); if (min == max) { min--; max++; } var pad = 30d; var chartW = width - pad * 2; var chartH = height - 48; double X(int i) => pad + chartW * i / (reportMonths.Count - 1); double Y(decimal v) => 16 + (double)((max - v) / (max - min)) * chartH;
         TrendCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = pad, X2 = width - pad, Y1 = Y(0), Y2 = Y(0), Stroke = Brushes.LightGray, StrokeThickness = 1 });
-        foreach (var series in selected) { var line = new System.Windows.Shapes.Polyline { Stroke = series.Brush, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round }; for (var i = 0; i < totals.Count; i++) line.Points.Add(new Point(X(i), Y(series.Get(totals[i])))); TrendCanvas.Children.Add(line); for (var i = 0; i < totals.Count; i++) { var p = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = series.Brush, ToolTip = $"{reportMonths[i].Key}\n{series.Name}: {Rules.Money(series.Get(totals[i]))} ریال" }; Canvas.SetLeft(p, X(i) - 4); Canvas.SetTop(p, Y(series.Get(totals[i])) - 4); TrendCanvas.Children.Add(p); } }
+        foreach (var series in selected) { var line = new System.Windows.Shapes.Polyline { Stroke = series.Brush, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round }; for (var i = 0; i < totals.Count; i++) line.Points.Add(new Point(X(i), Y(series.Get(totals[i])))); TrendCanvas.Children.Add(line); for (var i = 0; i < totals.Count; i++) { var p = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = series.Brush, ToolTip = $"{reportMonths[i].Key}\n{series.Name}: {Rules.ReportMoney(series.Get(totals[i]))} ریال" }; Canvas.SetLeft(p, X(i) - 4); Canvas.SetTop(p, Y(series.Get(totals[i])) - 4); TrendCanvas.Children.Add(p); } }
         for (var i = 0; i < reportMonths.Count; i++) { var label = new TextBlock { Text = reportMonths[i].Key, FontSize = 10, Foreground = Brushes.DimGray }; Canvas.SetLeft(label, X(i) - 24); Canvas.SetTop(label, height - 22); TrendCanvas.Children.Add(label); }
     }
     void PrintReport(object s, RoutedEventArgs e)
     {
-        if (!ResolveFixedEdit()) return; Guard(() => { var print = new PrintDialog(); if (print.ShowDialog() != true) return; var t = Total(current); var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth }; doc.Blocks.Add(new Paragraph(new Run("شرکت متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold }); doc.Blocks.Add(new Paragraph(new Run($"گزارش ماه {current.Key} — فروش: {Rules.Money(t.Sales)} ریال — سود ناخالص: {Rules.Money(t.Profit)} ریال — نتیجه: {Rules.Money(t.Net)} ریال ({Outcome(t.Net)})"))); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key); });
+        if (!ResolveFixedEdit()) return; Guard(() => { var print = new PrintDialog(); if (print.ShowDialog() != true) return; var t = Total(current); var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth }; doc.Blocks.Add(new Paragraph(new Run("شرکت متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold }); doc.Blocks.Add(new Paragraph(new Run($"گزارش ماه {current.Key} — فروش: {Rules.ReportMoney(t.Sales)} ریال — سود ناخالص: {Rules.ReportMoney(t.Profit)} ریال — نتیجه: {Rules.ReportMoney(t.Net)} ریال ({Outcome(t.Net)})"))); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key); });
     }
     void ExportExcel(object s, RoutedEventArgs e)
     {
@@ -513,7 +513,7 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup(); var enabled = preferences.AutoBackupOnExit; AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال"; AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray; AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است"; LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm"); var manual = preferences.LastBackupUtc != null; ManualBackupBadgeText.Text = manual ? "ثبت شده" : "ثبت نشده"; ManualBackupBadgeText.Foreground = manual ? Brushes.SeaGreen : Brushes.SlateGray; ManualBackupBadge.Background = manual ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); LastManualBackup.Text = manual ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
-    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۹ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
+    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۱۰ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
 public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purchase, decimal sales, decimal cost, decimal profit, decimal shortage)
@@ -524,25 +524,25 @@ public sealed class PurchaseGridRow(Purchase purchase, CatalogItem item)
 {
     public Purchase Value => purchase;
     public string Type => purchase.IsAdjustment ? "تعدیل" : "خرید"; public string Date => purchase.Date; public string Supplier => purchase.Supplier; public string Code => purchase.Code; public string Brand => item.Brand; public string Name => item.Name;
-    public string QuantityText => Rules.Money(purchase.Quantity); public string TotalText => Rules.Money(purchase.Total); public string DeductionsText => Rules.Money(purchase.Deductions); public string NetText => Rules.Money(Rules.NetPurchase(purchase));
+    public string QuantityText => Rules.Money(purchase.Quantity); public string TotalText => Rules.ReportMoney(purchase.Total); public string DeductionsText => Rules.ReportMoney(purchase.Deductions); public string NetText => Rules.ReportMoney(Rules.NetPurchase(purchase));
 }
 public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement settlement)
 {
     public Sale Value => sale; public SaleSettlement Settlement => settlement;
     public string Date => sale.Date; public string Customer => sale.Customer; public string Code => sale.Code; public string Brand => item.Brand; public string Name => item.Name;
-    public string QuantityText => Rules.Money(sale.Quantity); public string InvoiceNetText => Rules.Money(Rules.NetSaleBase(sale)); public string CashDiscountText => Rules.Money(Rules.CashDiscountAmount(sale)); public string SalesText => Rules.Money(settlement.Sales); public string CostText => Rules.Money(settlement.Cost);
+    public string QuantityText => Rules.Money(sale.Quantity); public string InvoiceNetText => Rules.ReportMoney(Rules.NetSaleBase(sale)); public string CashDiscountText => Rules.ReportMoney(Rules.CashDiscountAmount(sale)); public string SalesText => Rules.ReportMoney(settlement.Sales); public string CostText => Rules.ReportMoney(settlement.Cost);
     public string Status => settlement.Shortage > 0 ? $"کسری {Rules.Money(settlement.Shortage)}" : "تأییدشده";
 }
 public sealed class InventoryGridRow(CatalogItem item, decimal opening, decimal purchased, decimal sold, decimal closing, decimal cost)
 {
     public string Code => item.Code; public string Brand => item.Brand; public string Name => item.Name; public decimal Closing => closing; public decimal Cost => cost;
-    public string OpeningText => Rules.Money(opening); public string PurchasedText => Rules.Money(purchased); public string SoldText => Rules.Money(sold); public string ClosingText => Rules.Money(closing); public string CostText => Rules.Money(cost);
+    public string OpeningText => Rules.Money(opening); public string PurchasedText => Rules.Money(purchased); public string SoldText => Rules.Money(sold); public string ClosingText => Rules.Money(closing); public string CostText => Rules.ReportMoney(cost);
 }
 public sealed class ReconciliationGridRow(ReconciliationCandidate value)
 {
     public ReconciliationCandidate Candidate => value;
     public string FirstDate => value.FirstDate; public string Code => value.Code; public string Brand => value.Brand; public string Name => value.Name; public decimal Quantity => value.Quantity; public int SaleRows => value.SaleRows;
-    public string QuantityText => Rules.Money(value.Quantity); public string SuggestedText => value.SuggestedUnitCost <= 0 ? "نیازمند ورود دستی" : Rules.Money(value.SuggestedUnitCost);
+    public string QuantityText => Rules.Money(value.Quantity); public string SuggestedText => value.SuggestedUnitCost <= 0 ? "نیازمند ورود دستی" : Rules.ReportMoney(value.SuggestedUnitCost);
 }
 public sealed class PendingBrandGridRow(List<PendingBrandTransaction> values)
 {
@@ -562,9 +562,9 @@ public sealed class BrandSettingsRow(Brand brand)
 }
 public sealed class BrandRow(string brand, int count, decimal sales, decimal profit, decimal shortage)
 {
-    public int Rank { get; set; } public string Brand => brand; public int Count => count; public decimal Profit => profit; public string SalesText => Rules.Money(sales); public string ProfitText => Rules.Money(profit); public string MarginText => Rules.Percent(sales == 0 ? null : profit / sales); public string Status => shortage > 0 ? $"کسری {Rules.Money(shortage)}" : "تأییدشده";
+    public int Rank { get; set; } public string Brand => brand; public int Count => count; public decimal Profit => profit; public string SalesText => Rules.ReportMoney(sales); public string ProfitText => Rules.ReportMoney(profit); public string MarginText => Rules.Percent(sales == 0 ? null : profit / sales); public string Status => shortage > 0 ? $"کسری {Rules.Money(shortage)}" : "تأییدشده";
 }
 public sealed class HistoryRow(Month month, LedgerTotal total)
 {
-    public string Key => month.Key; public string CostText => Rules.Money(total.Cost); public string SalesText => Rules.Money(total.Sales); public string ProfitText => Rules.Money(total.Profit); public string FixedText => Rules.Money(total.FixedCost); public string NetText => Rules.Money(total.Net); public string OutcomeText => total.Net < 0 ? "زیان" : total.Net > 0 ? "سود" : "سر‌به‌سر";
+    public string Key => month.Key; public string CostText => Rules.ReportMoney(total.Cost); public string SalesText => Rules.ReportMoney(total.Sales); public string ProfitText => Rules.ReportMoney(total.Profit); public string FixedText => Rules.ReportMoney(total.FixedCost); public string NetText => Rules.ReportMoney(total.Net); public string OutcomeText => total.Net < 0 ? "زیان" : total.Net > 0 ? "سود" : "سر‌به‌سر";
 }
