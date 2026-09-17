@@ -48,7 +48,7 @@ public sealed class BrandManagerDialog : Window
     public BrandManagerDialog(IEnumerable<Brand> source)
     {
         Title = "مدیریت برندها"; Width = 1020; Height = 600; MinWidth = 820; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir"); brands = source.OrderBy(x => x.Name).ToList();
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir"); brands = source.OrderBy(x => x.Name).ToList();
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("مدیریت برندها", "پیشوند کد، برند کالاهای ورودی را تعیین می‌کند؛ درصدها برای ثبت‌های بعدی همان برند استفاده می‌شوند."));
         grid.AutoGenerateColumns = false; grid.Margin = new Thickness(22); grid.Columns.Add(new DataGridTextColumn { Header = "برند", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1.35, DataGridLengthUnitType.Star) });
@@ -78,7 +78,7 @@ public sealed class BrandEditorDialog : Window
     public BrandEditorDialog(Brand? brand)
     {
         Title = brand == null ? "افزودن برند" : "ویرایش برند"; Width = 520; Height = 710; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
         panel.Children.Add(DialogUi.Label("نام برند")); var name = DialogUi.Input(brand?.Name ?? ""); panel.Children.Add(name);
         panel.Children.Add(DialogUi.Label("پیشوند کد کالا")); var prefixes = DialogUi.Input(BrandPrefixRules.Display(brand?.CodePrefixes ?? [])); prefixes.ToolTip = "مثال: 106 یا 115، 145"; panel.Children.Add(prefixes);
@@ -104,7 +104,7 @@ public sealed class PendingBrandDialog : Window
     {
         this.selected = selected; this.pending = pending.ToList();
         Title = "تعیین برند کالا"; Width = 700; Height = 590; MinWidth = 600; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("تعیین برند کد ناشناخته", "ابتدا برند را انتخاب کنید. فقط در صورتی که از الگوی کد مطمئن هستید، قانون پیشوند را هم ثبت کنید."));
 
@@ -114,8 +114,11 @@ public sealed class PendingBrandDialog : Window
         panel.Children.Add(new TextBlock { Text = $"در صف: {selected.PurchaseRows} ردیف خرید و {selected.SaleRows} ردیف فروش · اولین تاریخ: {selected.FirstDate}", Foreground = new SolidColorBrush(Color.FromRgb(84, 98, 124)), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
 
         panel.Children.Add(new TextBlock { Text = "برند ثبت‌شده", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 22, 0, 2), TextAlignment = TextAlignment.Right });
-        var brand = new ComboBox { IsEditable = true, IsTextSearchEnabled = true, ItemsSource = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList(), HorizontalContentAlignment = HorizontalAlignment.Right, Height = 34, ToolTip = "نام برند را انتخاب یا جست‌وجو کنید" };
-        brand.SelectionChanged += (_, _) => { if (brand.SelectedItem is string selectedBrand) brand.Text = selectedBrand; };
+        // این کنترل فقط باید یک برندِ ثبت‌شده را انتخاب کند. Editable بودن آن باعث
+        // می‌شد بخش TextBoxِ قالب سفارشی، مقدار SelectedItem را در بعضی محیط‌ها
+        // نمایش ندهد. حالت انتخابیِ معمولی مقدار انتخاب‌شده را همیشه نشان می‌دهد
+        // و همچنان با تایپِ ابتدای نام، انتخاب سریع در فهرست ممکن است.
+        var brand = new ComboBox { IsEditable = false, IsTextSearchEnabled = true, ItemsSource = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList(), HorizontalContentAlignment = HorizontalAlignment.Right, Height = 34, ToolTip = "یک برند ثبت‌شده را انتخاب کنید" };
         panel.Children.Add(brand);
         panel.Children.Add(new TextBlock { Text = "اگر برند موردنظر وجود ندارد، ابتدا آن را از دکمه «+ افزودن برند» با درصدهایش ثبت کنید.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 12) });
 
@@ -192,7 +195,7 @@ public sealed class ReconciliationDialog : Window
     {
         baseline = ledger; initial = candidate; this.canEditMonth = canEditMonth; purchases = ledger.Purchases.ToList();
         Title = "رسیدگی به مغایرت موجودی"; Width = 850; Height = 760; MinWidth = 700; MinHeight = 590; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("رسیدگی به مغایرت موجودی", "تعدیل در تاریخ اولین کسری ثبت می‌شود و در همان روز، پیش از فروش محاسبه خواهد شد."));
 
@@ -299,7 +302,7 @@ public sealed class PurchaseDialog : Window
     public PurchaseDialog(Ledger ledger, bool adjustment = false, string? code = null, decimal quantity = 0, decimal suggestedUnitPrice = 0, string? dateValue = null)
     {
         Title = adjustment ? "تعدیل موجودی" : "ثبت خرید"; Width = 640; Height = 690; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
         panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(dateValue ?? DialogUi.Today()); panel.Children.Add(date);
         panel.Children.Add(DialogUi.Label("کد کالا")); var codeBox = DialogUi.Input(code ?? ""); panel.Children.Add(codeBox);
@@ -329,7 +332,7 @@ public sealed class SaleDialog : Window
     public SaleDialog(Ledger ledger)
     {
         Title = "ثبت فروش"; Width = 640; Height = 610; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
         panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(DialogUi.Today()); panel.Children.Add(date);
         panel.Children.Add(DialogUi.Label("کد کالا")); var code = DialogUi.Input(); panel.Children.Add(code);
@@ -376,7 +379,7 @@ public sealed class SaleEditorDialog : Window
         this.ledger = ledger; this.original = original;
         var item = ledger.Items.First(x => x.Code.Equals(original.Code, StringComparison.OrdinalIgnoreCase));
         Title = "ویرایش فروش"; Width = 760; Height = 700; MinWidth = 640; MinHeight = 590; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("ویرایش فروش", "با هر تغییر، بهای FIFO و سود این فروش بر اساس کل گردش کالا دوباره محاسبه می‌شود."));
 

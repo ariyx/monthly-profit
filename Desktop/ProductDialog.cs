@@ -23,14 +23,14 @@ public sealed class ProductDialog : Window
         original = product ?? new Product(); others = all;
         Title = product == null ? "افزودن کالا" : "ویرایش کالا";
         Width = 940; Height = 780; MinWidth = 760; MinHeight = 720; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
 
-        var root = new Grid { FlowDirection = FlowDirection.RightToLeft };
+        var root = new Grid { FlowDirection = FlowDirection.LeftToRight };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         var headerText = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
         headerText.Children.Add(new TextBlock { Text = Title, FontSize = 22, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
         headerText.Children.Add(new TextBlock { Text = "اطلاعات و درصدهای این کالا فقط در ماه فعال ثبت می‌شوند.", Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)), Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
-        var headerLayout = new Grid { FlowDirection = FlowDirection.RightToLeft };
+        var headerLayout = new Grid { FlowDirection = FlowDirection.LeftToRight };
         headerLayout.Children.Add(headerText);
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(26, 19, 26, 18), Child = headerLayout };
         root.Children.Add(header);
@@ -54,7 +54,7 @@ public sealed class ProductDialog : Window
         }
         Grid FieldsGrid(int columns, int rows)
         {
-            var grid = new Grid { FlowDirection = FlowDirection.RightToLeft };
+            var grid = new Grid { FlowDirection = FlowDirection.LeftToRight };
             for (var i = 0; i < columns; i++) grid.ColumnDefinitions.Add(new ColumnDefinition());
             for (var i = 0; i < rows; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             outer.Children.Add(grid); return grid;
@@ -119,8 +119,8 @@ public sealed class MonthDialog : Window
     public MonthDialog(string suggested, bool copy, bool edit = false)
     {
         Title = edit ? "ویرایش ماه" : copy ? "کپی به ماه جدید" : "ماه جدید"; Width = 440; Height = 335; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var root = new Grid { FlowDirection = FlowDirection.RightToLeft }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var root = new Grid { FlowDirection = FlowDirection.LeftToRight }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
         var header = new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 17), Child = new TextBlock { Text = Title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft } }; root.Children.Add(header);
         var panel = new StackPanel { Margin = new Thickness(24, 20, 24, 24), FlowDirection = FlowDirection.RightToLeft }; Grid.SetRow(panel, 1); root.Children.Add(panel);
         panel.Children.Add(new TextBlock { Text = "ماه شمسی", FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right }); var input = new TextBox { Text = suggested, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right }; panel.Children.Add(input);
@@ -139,18 +139,18 @@ public sealed class FixedExpensesDialog : Window
     public FixedExpensesDialog(Month month)
     {
         Title = "ریز هزینه‌های ثابت"; Width = 900; Height = 480; MinWidth = 760; MinHeight = 410; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var root = new Grid { FlowDirection = FlowDirection.RightToLeft }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
-        var headerLayout = new Grid { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch };
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var root = new Grid { FlowDirection = FlowDirection.LeftToRight }; root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); Content = root;
+        var headerLayout = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch };
         var headerText = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
         headerText.Children.Add(new TextBlock { Text = "ریز هزینه‌های ثابت ماه", FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
         headerText.Children.Add(new TextBlock { Text = "جمع ردیف‌ها، هزینهٔ ثابت ماه را تعیین می‌کند.", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 7, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
         headerLayout.Children.Add(headerText);
         root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16), Child = headerLayout });
 
-        var body = new Grid { Margin = new Thickness(26, 20, 26, 24), FlowDirection = FlowDirection.RightToLeft };
+        var body = new Grid { Margin = new Thickness(26, 20, 26, 24), FlowDirection = FlowDirection.LeftToRight };
         body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
-        var columnLabels = new Grid { FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(4, 0, 4, 5) };
+        var columnLabels = new Grid { FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(4, 0, 4, 5) };
         columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); columnLabels.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         var titleLabel = new TextBlock { Text = "عنوان هزینه", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
         var amountLabel = new TextBlock { Text = "مبلغ — ریال", Style = (Style)FindResource("FieldLabel"), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
@@ -160,7 +160,7 @@ public sealed class FixedExpensesDialog : Window
         Grid.SetRow(listScroll, 1); body.Children.Add(listScroll);
         void Add(FixedExpense? item = null)
         {
-            var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.RightToLeft }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var row = new Grid { Margin = new Thickness(0, 4, 0, 4), FlowDirection = FlowDirection.LeftToRight }; row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(86) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(220) }); row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             var title = new TextBox { Text = item?.Title ?? "", Margin = new Thickness(4), ToolTip = "عنوان هزینه", FontSize = 14, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right };
             var amount = new TextBox { Text = item == null ? "" : Rules.Money(item.Amount), Margin = new Thickness(4), ToolTip = "مبلغ ریال", FontSize = 14, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right }; MoneyInput.Attach(amount);
             var remove = new Button { Content = "حذف", Margin = new Thickness(4), Padding = new Thickness(8, 8, 8, 8) };
@@ -193,7 +193,7 @@ public sealed class ImportReviewDialog : Window
     public ImportReviewDialog(ImportReview review, IReadOnlyCollection<Product> existing)
     {
         Title = "بازبینی ورود Excel"; Width = 700; Height = 560; MinHeight = 420; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var existingKeys = existing.Select(x => Rules.Normalize(x.Brand) + "\u001f" + Rules.Normalize(x.Name)).ToHashSet(); var seen = new HashSet<string>();
         var duplicates = new List<string>();
         Products = review.Products.Where(p => { var key = Rules.Normalize(p.Brand) + "\u001f" + Rules.Normalize(p.Name); var duplicate = !seen.Add(key) || existingKeys.Contains(key); if (duplicate) duplicates.Add(p.Brand + " / " + p.Name); return !duplicate; }).ToList();

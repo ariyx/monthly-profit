@@ -8,7 +8,9 @@
   <Style TargetType="Window">
 <Setter Property="FontFamily" Value="{StaticResource Vazir}"/>
 <Setter Property="FontSize" Value="13"/>
-<Setter Property="FlowDirection" Value="RightToLeft"/>
+<!-- پنجرهٔ مادر LTR می‌ماند تا مختصات Grid و DockPanel وارونه نشود.
+     عناصر متنی و کنترل‌های فارسی در سبک‌های خودشان RTL هستند. -->
+<Setter Property="FlowDirection" Value="LeftToRight"/>
 <Setter Property="Background" Value="#F5F7FB"/>
 <Setter Property="TextElement.Foreground" Value="{StaticResource Ink}"/>
 <Setter Property="UseLayoutRounding" Value="True"/>
@@ -19,6 +21,7 @@
 <Setter Property="TextAlignment" Value="Right"/>
 </Style>
   <Style TargetType="Button">
+<Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="Padding" Value="15,9"/>
 <Setter Property="Margin" Value="4"/>
 <Setter Property="MinHeight" Value="36"/>
@@ -160,7 +163,7 @@
 </Setter>
 </Style>
   <Style x:Key="Panel" TargetType="Border">
-<Setter Property="FlowDirection" Value="RightToLeft"/>
+<Setter Property="FlowDirection" Value="LeftToRight"/>
 <Setter Property="Background" Value="White"/>
 <Setter Property="BorderBrush" Value="#E4E8EF"/>
 <Setter Property="BorderThickness" Value="1"/>
@@ -193,15 +196,18 @@
 <Setter Property="FontSize" Value="13"/>
 <Setter Property="FontWeight" Value="SemiBold"/>
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
+<Setter Property="FlowDirection" Value="RightToLeft"/>
+<Setter Property="TextAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
   <Style x:Key="TrendCheckBox" TargetType="CheckBox">
-<Setter Property="FlowDirection" Value="LeftToRight"/>
+<Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="Margin" Value="9,0"/>
 <Setter Property="VerticalAlignment" Value="Center"/>
 <Setter Property="Template">
 <Setter.Value>
 <ControlTemplate TargetType="CheckBox">
-<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+<StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
 <Border x:Name="Indicator" Width="17" Height="17" Background="#F8FAFC" BorderBrush="#B8C1D1" BorderThickness="1" CornerRadius="4" Margin="0,0,7,0">
 <Grid>
 <Path x:Name="CheckMark" Data="M 3,8 L 6.5,11.5 L 13,4" Stroke="White" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed"/>
@@ -272,7 +278,8 @@
 <ColumnDefinition Width="208"/>
 </Grid.ColumnDefinitions>
 <Border Grid.Column="0" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="14" Padding="0" SnapsToDevicePixels="True" TextElement.Foreground="{StaticResource Ink}">
-<ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" FlowDirection="RightToLeft"/>
+<!-- محتوای صفحات نباید آینه شود؛ هر کنترل فارسی RTL را از سبک خودش می‌گیرد. -->
+<ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" FlowDirection="LeftToRight"/>
 </Border>
 <Border Grid.Column="1" Background="White" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="14" Margin="14,0,0,0" Padding="10,16" FlowDirection="RightToLeft">
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
