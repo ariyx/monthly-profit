@@ -22,6 +22,8 @@ public partial class MainWindow : Window
     List<Month> reportMonths = [];
     List<ReconciliationCandidate> reconciliationCandidates = [];
     List<PendingBrandGridRow> pendingBrandRows = [];
+    List<PurchaseGridRow> purchaseRows = [];
+    List<SaleGridRow> saleRows = [];
     string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonthlyProfit", "Data");
 
     public MainWindow()
@@ -31,7 +33,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۶ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۷ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -113,15 +115,29 @@ public partial class MainWindow : Window
         if (!CanEdit()) return; var d = new FixedExpensesDialog(current) { Owner = this }; if (d.ShowDialog() != true || d.Value == null) return;
         Guard(() => SaveMonth(current with { FixedExpenses = d.Value, FixedCost = d.Value.Sum(x => x.Amount) }, "ریز هزینه‌های ثابت ویرایش شد"));
     }
-    void ManageBrands(object s, RoutedEventArgs e)
+    void AddBrand(object s, RoutedEventArgs e)
     {
-        var d = new BrandManagerDialog(ledger.Brands) { Owner = this }; if (d.ShowDialog() != true || d.Value == null) return;
+        var d = new BrandEditorDialog(null) { Owner = this }; if (d.ShowDialog() != true || d.Value == null) return;
         Guard(() =>
         {
-            BrandPrefixRules.ValidateUnique(d.Value);
-            var names = d.Value.Select(x => Rules.Normalize(x.Name)).ToHashSet(); var used = ledger.Items.Select(x => Rules.Normalize(x.Brand)).Distinct().Where(x => !names.Contains(x)).ToList();
-            if (used.Count > 0) throw new InvalidDataException("برندهای استفاده‌شده قابل حذف یا تغییر نام نیستند: " + string.Join("، ", used));
-            SaveLedger(ledger with { Brands = d.Value }, "تنظیمات برندها ذخیره شد");
+            if (ledger.Brands.Any(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(d.Value.Name), StringComparison.OrdinalIgnoreCase))) throw new InvalidDataException("این برند قبلاً ثبت شده است.");
+            var brands = ledger.Brands.Append(d.Value).ToList(); BrandPrefixRules.ValidateUnique(brands);
+            SaveLedger(ledger with { Brands = brands }, $"برند «{d.Value.Name}» افزوده شد");
+        });
+    }
+    void BrandSettingsGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
+    {
+        Guard(() =>
+        {
+            if (BrandSettingsGrid.SelectedItem is not BrandSettingsRow row) return;
+            var d = new BrandEditorDialog(row.Value) { Owner = this }; if (d.ShowDialog() != true || d.Value == null) return;
+            var previous = row.Value; var nextBrand = d.Value;
+            var used = ledger.Items.Any(x => Rules.Normalize(x.Brand).Equals(Rules.Normalize(previous.Name), StringComparison.OrdinalIgnoreCase));
+            if (used && !Rules.Normalize(previous.Name).Equals(Rules.Normalize(nextBrand.Name), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("نام برندی که قبلاً روی کالا ثبت شده قابل تغییر نیست؛ سایر تنظیمات آن قابل ویرایش‌اند.");
+            var brands = ledger.Brands.Select(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(previous.Name), StringComparison.OrdinalIgnoreCase) ? nextBrand : x).ToList();
+            if (brands.Select(x => Rules.Normalize(x.Name)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != brands.Count) throw new InvalidDataException("نام برند تکراری است.");
+            BrandPrefixRules.ValidateUnique(brands);
+            SaveLedger(ledger with { Brands = brands }, $"تنظیمات برند «{nextBrand.Name}» ویرایش شد");
         });
     }
     void AddPurchase(object s, RoutedEventArgs e)
@@ -144,6 +160,58 @@ public partial class MainWindow : Window
     {
         // فروش بدون وقفه ثبت می‌شود؛ هر کسری بعداً و به‌صورت قابل جست‌وجو در تب مغایرت‌ها تعیین تکلیف خواهد شد.
         SaveLedger(ledger with { Sales = [.. ledger.Sales, sale] }, action + "؛ مغایرت احتمالی در تب مغایرت‌ها قابل بررسی است.", Rules.MonthOf(sale.Date));
+    }
+    void SalesGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
+    {
+        Guard(() =>
+        {
+            if (SalesGrid.SelectedItem is not SaleGridRow row) return;
+            if (!CanEdit(Rules.MonthOf(row.Value.Date))) return;
+            var dialog = new SaleEditorDialog(ledger, row.Value) { Owner = this };
+            if (dialog.ShowDialog() != true || dialog.Value == null) return;
+            if (!CanEdit(Rules.MonthOf(dialog.Value.Date))) return;
+            var sales = ledger.Sales.ToList(); var index = sales.FindIndex(x => x.Id == row.Value.Id);
+            if (index < 0) throw new InvalidOperationException("فروش انتخاب‌شده دیگر یافت نشد.");
+            sales[index] = dialog.Value;
+            SaveLedger(ledger with { Sales = sales }, $"فروش کد {dialog.Value.Code} ویرایش شد", Rules.MonthOf(dialog.Value.Date));
+        });
+    }
+    void PurchaseSearchChanged(object s, TextChangedEventArgs e) => ApplyPurchaseFilter();
+    void PurchaseFilterChanged(object s, SelectionChangedEventArgs e) => ApplyPurchaseFilter();
+    void ClearPurchaseFilters(object s, RoutedEventArgs e)
+    {
+        PurchaseSearch.Text = ""; PurchaseBrandFilter.SelectedItem = "همه برندها"; ApplyPurchaseFilter();
+    }
+    void SaleSearchChanged(object s, TextChangedEventArgs e) => ApplySaleFilter();
+    void SaleFilterChanged(object s, SelectionChangedEventArgs e) => ApplySaleFilter();
+    void ClearSaleFilters(object s, RoutedEventArgs e)
+    {
+        SaleSearch.Text = ""; SaleBrandFilter.SelectedItem = "همه برندها"; ApplySaleFilter();
+    }
+    static void SetBrandFilter(ComboBox filter, IEnumerable<string> brands)
+    {
+        var selected = filter.SelectedItem as string;
+        var options = new[] { "همه برندها" }.Concat(brands.OrderBy(x => x, StringComparer.OrdinalIgnoreCase)).ToList();
+        filter.ItemsSource = options; filter.SelectedItem = options.Contains(selected ?? "", StringComparer.OrdinalIgnoreCase) ? selected : "همه برندها";
+    }
+    void ApplyPurchaseFilter()
+    {
+        if (PurchasesGrid == null) return;
+        var needle = Rules.Normalize(PurchaseSearch?.Text ?? ""); var brand = PurchaseBrandFilter?.SelectedItem as string ?? "همه برندها";
+        var visible = purchaseRows.Where(x => (brand == "همه برندها" || x.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase)) &&
+            (needle.Length == 0 || x.Supplier.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
+        PurchasesGrid.ItemsSource = visible;
+        PurchaseSummary.Text = $"{visible.Count} از {purchaseRows.Count} ردیف · {Rules.Money(visible.Sum(x => x.Value.Quantity))} عدد · بهای خالص خرید: {Rules.Money(visible.Sum(x => Rules.NetPurchase(x.Value)))} ریال";
+    }
+    void ApplySaleFilter()
+    {
+        if (SalesGrid == null) return;
+        var needle = Rules.Normalize(SaleSearch?.Text ?? ""); var brand = SaleBrandFilter?.SelectedItem as string ?? "همه برندها";
+        var visible = saleRows.Where(x => (brand == "همه برندها" || x.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase)) &&
+            (needle.Length == 0 || x.Customer.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
+        SalesGrid.ItemsSource = visible;
+        var invoice = visible.Sum(x => Rules.NetSaleBase(x.Value)); var discount = visible.Sum(x => Rules.CashDiscountAmount(x.Value)); var sales = visible.Sum(x => x.Settlement.Sales); var cost = visible.Sum(x => x.Settlement.Cost); var shortage = visible.Sum(x => x.Settlement.Shortage);
+        SaleSummary.Text = $"{visible.Count} از {saleRows.Count} ردیف · فروش پس از کسورات: {Rules.Money(invoice)} ریال · تخفیف نقدی: {Rules.Money(discount)} ریال · دریافتی نهایی: {Rules.Money(sales)} ریال · سود ناخالص: {Rules.Money(sales - cost)} ریال" + (shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(shortage)} عدد" : "");
     }
 
     void OpenReconciliations(object s, RoutedEventArgs e)
@@ -320,14 +388,15 @@ public partial class MainWindow : Window
     {
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var purchases = ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToList();
-        PurchasesGrid.ItemsSource = purchases.Select(x => new PurchaseGridRow(x, items[x.Code])).ToList();
-        PurchaseSummary.Text = $"{purchases.Count} ردیف · {Rules.Money(purchases.Sum(x => x.Quantity))} عدد · بهای خالص خرید: {Rules.Money(purchases.Sum(Rules.NetPurchase))} ریال";
+        purchaseRows = purchases.Select(x => new PurchaseGridRow(x, items[x.Code])).ToList();
+        SetBrandFilter(PurchaseBrandFilter, purchaseRows.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase));
+        ApplyPurchaseFilter();
 
         var calc = LedgerCalculator.Calculate(ledger);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToList();
-        SalesGrid.ItemsSource = sales.Select(x => new SaleGridRow(x, items[x.Code], calc.Sales[x.Id])).ToList();
-        var total = LedgerCalculator.SummarizeMonth(ledger, current);
-        SaleSummary.Text = $"{sales.Count} ردیف · فروش پس از کسورات: {Rules.Money(total.InvoiceSales)} ریال · تخفیف نقدی: {Rules.Money(total.CashDiscountAmount)} ریال · دریافتی نهایی: {Rules.Money(total.Sales)} ریال" + (total.Shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(total.Shortage)} عدد" : "");
+        saleRows = sales.Select(x => new SaleGridRow(x, items[x.Code], calc.Sales[x.Id])).ToList();
+        SetBrandFilter(SaleBrandFilter, saleRows.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase));
+        ApplySaleFilter();
     }
 
     static string PreviousMonth(string key)
@@ -444,7 +513,7 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup(); var enabled = preferences.AutoBackupOnExit; AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال"; AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray; AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است"; LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm"); var manual = preferences.LastBackupUtc != null; ManualBackupBadgeText.Text = manual ? "ثبت شده" : "ثبت نشده"; ManualBackupBadgeText.Foreground = manual ? Brushes.SeaGreen : Brushes.SlateGray; ManualBackupBadge.Background = manual ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); LastManualBackup.Text = manual ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
-    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۶ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
+    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۷ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
 public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purchase, decimal sales, decimal cost, decimal profit, decimal shortage)
@@ -453,11 +522,13 @@ public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purcha
 }
 public sealed class PurchaseGridRow(Purchase purchase, CatalogItem item)
 {
+    public Purchase Value => purchase;
     public string Type => purchase.IsAdjustment ? "تعدیل" : "خرید"; public string Date => purchase.Date; public string Supplier => purchase.Supplier; public string Code => purchase.Code; public string Brand => item.Brand; public string Name => item.Name;
     public string QuantityText => Rules.Money(purchase.Quantity); public string TotalText => Rules.Money(purchase.Total); public string DeductionsText => Rules.Money(purchase.Deductions); public string NetText => Rules.Money(Rules.NetPurchase(purchase));
 }
 public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement settlement)
 {
+    public Sale Value => sale; public SaleSettlement Settlement => settlement;
     public string Date => sale.Date; public string Customer => sale.Customer; public string Code => sale.Code; public string Brand => item.Brand; public string Name => item.Name;
     public string QuantityText => Rules.Money(sale.Quantity); public string InvoiceNetText => Rules.Money(Rules.NetSaleBase(sale)); public string CashDiscountText => Rules.Money(Rules.CashDiscountAmount(sale)); public string SalesText => Rules.Money(settlement.Sales); public string CostText => Rules.Money(settlement.Cost);
     public string Status => settlement.Shortage > 0 ? $"کسری {Rules.Money(settlement.Shortage)}" : "تأییدشده";
@@ -485,6 +556,7 @@ public sealed class PendingBrandGridRow(List<PendingBrandTransaction> values)
 }
 public sealed class BrandSettingsRow(Brand brand)
 {
+    public Brand Value => brand;
     public string Name => brand.Name; public string Prefixes => BrandPrefixRules.Display(brand.CodePrefixes); public string PurchaseDiscountText => Rules.Percent(brand.PurchaseDiscount); public string OfferText => Rules.Percent(brand.Offer); public string MarkupText => Rules.Percent(brand.Markup);
     public string CashShareText => Rules.Percent(brand.CashShare); public string CreditShareText => Rules.Percent(brand.CreditShare); public string CashDiscountText => Rules.Percent(brand.CashDiscount);
 }

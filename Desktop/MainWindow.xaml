@@ -1,4 +1,4 @@
-<Window x:Class="Profit.Desktop.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="شرکت متحد توزیع ایرانیان | مدیریت سود ماهانه" Width="1280" Height="860" MinWidth="980" MinHeight="680" WindowStartupLocation="CenterScreen">
+<Window x:Class="Profit.Desktop.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" Title="شرکت متحد توزیع ایرانیان | مدیریت سود ماهانه" Width="1280" Height="860" MinWidth="980" MinHeight="680" WindowStartupLocation="CenterScreen" FontFamily="{StaticResource Vazir}" FlowDirection="RightToLeft">
 <Grid Margin="20">
 <Grid.RowDefinitions>
 <RowDefinition Height="Auto"/>
@@ -25,7 +25,6 @@
 <TextBlock x:Name="ClosedBadge" Text="ماه باز" Foreground="#157347" VerticalAlignment="Center"/>
 </Border>
 <ComboBox x:Name="Months" Width="112" SelectionChanged="MonthChanged" Margin="0,0,5,0"/>
-<Button Content="مدیریت برند" Click="ManageBrands" Style="{StaticResource Primary}" Margin="0,0,5,0"/>
 <Button Content="⋯" Click="OpenMonthMenu" Width="34" FontSize="18" FontWeight="SemiBold" Padding="0,0,0,4" ToolTip="عملیات ماه">
 <Button.ContextMenu>
 <ContextMenu FlowDirection="RightToLeft">
@@ -41,7 +40,7 @@
 <TabItem Header="داشبورد">
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
-<StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
+<StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
@@ -92,7 +91,7 @@
 </Grid>
 <Border Style="{StaticResource Panel}">
 <StackPanel>
-<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="LeftToRight">
+<StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="RightToLeft">
 <TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}"/>
 <TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
@@ -118,7 +117,7 @@
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel>
 <TextBlock Text="خریدهای ماه انتخاب‌شده" Style="{StaticResource PageTitle}"/>
 <TextBlock x:Name="PurchaseSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12"/>
-<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><Button Content="ورود خرید از اکسل" Click="ImportPurchases"/><Button Content="+ خرید دستی" Click="AddPurchase" Style="{StaticResource Primary}"/></WrapPanel>
+<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><Button Content="ورود خرید از اکسل" Click="ImportPurchases"/><Button Content="+ خرید دستی" Click="AddPurchase" Style="{StaticResource Primary}"/><TextBlock Text="برند:" VerticalAlignment="Center" Margin="12,0,3,0"/><ComboBox x:Name="PurchaseBrandFilter" Width="160" SelectionChanged="PurchaseFilterChanged"/><TextBox x:Name="PurchaseSearch" Style="{StaticResource SearchBox}" Width="250" ToolTip="جست‌وجو در تأمین‌کننده، کد، کالا یا برند" TextChanged="PurchaseSearchChanged"/><Button Content="پاک‌کردن فیلتر" Click="ClearPurchaseFilters"/></WrapPanel>
 </StackPanel></Border>
 <DataGrid x:Name="PurchasesGrid"><DataGrid.Columns>
 <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width=".7*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="0.8*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="تأمین‌کننده" Binding="{Binding Supplier}" Width="1.45*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="0.9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="1.8*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="تعداد" Binding="{Binding QuantityText}" Width="0.65*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="مبلغ کل" Binding="{Binding TotalText}" Width="1.15*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="کسورات" Binding="{Binding DeductionsText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="بهای خالص" Binding="{Binding NetText}" Width="1.2*" ElementStyle="{StaticResource TableNumber}"/>
@@ -130,9 +129,9 @@
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel>
 <TextBlock Text="فروش‌های ماه انتخاب‌شده" Style="{StaticResource PageTitle}"/>
 <TextBlock x:Name="SaleSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12" TextWrapping="Wrap"/>
-<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><Button Content="ورود فروش از اکسل" Click="ImportSales"/><Button Content="+ فروش دستی" Click="AddSale" Style="{StaticResource Primary}"/></WrapPanel>
+<WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><Button Content="ورود فروش از اکسل" Click="ImportSales"/><Button Content="+ فروش دستی" Click="AddSale" Style="{StaticResource Primary}"/><TextBlock Text="برند:" VerticalAlignment="Center" Margin="12,0,3,0"/><ComboBox x:Name="SaleBrandFilter" Width="160" SelectionChanged="SaleFilterChanged"/><TextBox x:Name="SaleSearch" Style="{StaticResource SearchBox}" Width="250" ToolTip="جست‌وجو در مشتری، کد، کالا یا برند" TextChanged="SaleSearchChanged"/><Button Content="پاک‌کردن فیلتر" Click="ClearSaleFilters"/></WrapPanel>
 </StackPanel></Border>
-<DataGrid x:Name="SalesGrid"><DataGrid.Columns>
+<DataGrid x:Name="SalesGrid" MouseDoubleClick="SalesGrid_MouseDoubleClick"><DataGrid.Columns>
 <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="0.75*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="مشتری" Binding="{Binding Customer}" Width="1.35*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="0.85*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width=".9*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="1.55*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="تعداد" Binding="{Binding QuantityText}" Width=".6*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="پس از کسورات" Binding="{Binding InvoiceNetText}" Width="1.15*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="تخفیف نقدی" Binding="{Binding CashDiscountText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="دریافتی نهایی" Binding="{Binding SalesText}" Width="1.15*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="بهای FIFO" Binding="{Binding CostText}" Width="1.1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width=".85*" ElementStyle="{StaticResource TableText}"/>
 </DataGrid.Columns></DataGrid>
 </DockPanel>
@@ -151,20 +150,20 @@
 </TabItem>
 <TabItem Header="مغایرت‌ها">
 <DockPanel Margin="22">
-<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="مغایرت‌های موجودی" Style="{StaticResource PageTitle}"/><TextBlock x:Name="ReconciliationSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12" TextWrapping="Wrap"/><WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><TextBlock Text="برای رسیدگی به هر کالا، روی ردیف آن دوبار کلیک کنید." Style="{StaticResource MutedText}" VerticalAlignment="Center"/><TextBox x:Name="ReconciliationSearch" Width="260" ToolTip="جست‌وجو در کد، کالا یا برند" TextAlignment="Right" TextChanged="ReconciliationSearchChanged" Margin="12,0,0,0"/><Button Content="پاک‌کردن جست‌وجو" Click="ClearReconciliationSearch"/></WrapPanel></StackPanel></Border>
+<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="مغایرت‌های موجودی" Style="{StaticResource PageTitle}"/><TextBlock x:Name="ReconciliationSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12" TextWrapping="Wrap"/><WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><TextBlock Text="برای رسیدگی به هر کالا، روی ردیف آن دوبار کلیک کنید." Style="{StaticResource MutedText}" VerticalAlignment="Center"/><TextBox x:Name="ReconciliationSearch" Style="{StaticResource SearchBox}" Width="260" ToolTip="جست‌وجو در کد، کالا یا برند" TextChanged="ReconciliationSearchChanged"/><Button Content="پاک‌کردن جست‌وجو" Click="ClearReconciliationSearch"/></WrapPanel></StackPanel></Border>
 <DataGrid x:Name="ReconciliationsGrid" SelectionMode="Single" MouseDoubleClick="ReconciliationsGrid_MouseDoubleClick"><DataGrid.Columns><DataGridTextColumn Header="اولین تاریخ کسری" Binding="{Binding FirstDate}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.1*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="2*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="کسری" Binding="{Binding QuantityText}" Width="1*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="قیمت پیشنهادی" Binding="{Binding SuggestedText}" Width="1.3*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="ردیف فروش" Binding="{Binding SaleRows}" Width=".8*" ElementStyle="{StaticResource TableCenter}"/></DataGrid.Columns></DataGrid>
 </DockPanel>
 </TabItem>
 <TabItem Header="کدهای ناشناخته">
 <DockPanel Margin="22">
-<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="کدهای نیازمند تعیین برند" Style="{StaticResource PageTitle}"/><TextBlock x:Name="PendingBrandSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12" TextWrapping="Wrap"/><WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><TextBlock Text="برای تعیین برند هر کالا، روی ردیف آن دوبار کلیک کنید." Style="{StaticResource MutedText}" VerticalAlignment="Center"/><TextBox x:Name="PendingBrandSearch" Width="260" ToolTip="جست‌وجو در کد یا نام کالا" TextAlignment="Right" TextChanged="PendingBrandSearchChanged" Margin="12,0,0,0"/><Button Content="پاک‌کردن جست‌وجو" Click="ClearPendingBrandSearch"/><Button Content="مدیریت برندها" Click="ManageBrands"/></WrapPanel></StackPanel></Border>
+<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="کدهای نیازمند تعیین برند" Style="{StaticResource PageTitle}"/><TextBlock x:Name="PendingBrandSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12" TextWrapping="Wrap"/><WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><TextBlock Text="برای تعیین برند هر کالا، روی ردیف آن دوبار کلیک کنید." Style="{StaticResource MutedText}" VerticalAlignment="Center"/><TextBox x:Name="PendingBrandSearch" Style="{StaticResource SearchBox}" Width="260" ToolTip="جست‌وجو در کد یا نام کالا" TextChanged="PendingBrandSearchChanged"/><Button Content="پاک‌کردن جست‌وجو" Click="ClearPendingBrandSearch"/><Button Content="+ افزودن برند" Click="AddBrand"/></WrapPanel></StackPanel></Border>
 <DataGrid x:Name="PendingBrandsGrid" SelectionMode="Single" MouseDoubleClick="PendingBrandsGrid_MouseDoubleClick"><DataGrid.Columns><DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="2.4*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="ردیف خرید" Binding="{Binding PurchaseRows}" Width=".9*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="ردیف فروش" Binding="{Binding SaleRows}" Width=".9*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="تعداد کل" Binding="{Binding QuantityText}" Width="1*" ElementStyle="{StaticResource TableCenter}"/><DataGridTextColumn Header="اولین تاریخ" Binding="{Binding FirstDate}" Width="1*" ElementStyle="{StaticResource TableNumber}"/></DataGrid.Columns></DataGrid>
 </DockPanel>
 </TabItem>
 <TabItem Header="برندها">
 <DockPanel Margin="22">
-<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="تنظیمات برندها" Style="{StaticResource PageTitle}"/><TextBlock x:Name="BrandSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12"/><Button Content="مدیریت برندها" Click="ManageBrands" Style="{StaticResource Primary}" HorizontalAlignment="Right"/></StackPanel></Border>
-<DataGrid x:Name="BrandSettingsGrid"><DataGrid.Columns><DataGridTextColumn Header="برند" Binding="{Binding Name}" Width="1.3*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="پیشوند کد" Binding="{Binding Prefixes}" Width="1*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="تخفیف خرید" Binding="{Binding PurchaseDiscountText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="آفر" Binding="{Binding OfferText}" Width=".8*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="مارک‌آپ" Binding="{Binding MarkupText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="سهم نقدی" Binding="{Binding CashShareText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="سهم چکی" Binding="{Binding CreditShareText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="تخفیف نقدی" Binding="{Binding CashDiscountText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/></DataGrid.Columns></DataGrid>
+<Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel><TextBlock Text="تنظیمات برندها" Style="{StaticResource PageTitle}"/><TextBlock x:Name="BrandSummary" Style="{StaticResource MutedText}" Margin="0,5,0,12"/><WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right"><Button Content="+ افزودن برند" Click="AddBrand" Style="{StaticResource Primary}"/><TextBlock Text="برای ویرایش هر برند، روی ردیف آن دوبار کلیک کنید." Style="{StaticResource MutedText}" VerticalAlignment="Center"/></WrapPanel></StackPanel></Border>
+<DataGrid x:Name="BrandSettingsGrid" MouseDoubleClick="BrandSettingsGrid_MouseDoubleClick"><DataGrid.Columns><DataGridTextColumn Header="برند" Binding="{Binding Name}" Width="1.3*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="پیشوند کد" Binding="{Binding Prefixes}" Width="1*" ElementStyle="{StaticResource TableText}"/><DataGridTextColumn Header="تخفیف خرید" Binding="{Binding PurchaseDiscountText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="آفر" Binding="{Binding OfferText}" Width=".8*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="مارک‌آپ" Binding="{Binding MarkupText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="سهم نقدی" Binding="{Binding CashShareText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="سهم چکی" Binding="{Binding CreditShareText}" Width=".9*" ElementStyle="{StaticResource TableNumber}"/><DataGridTextColumn Header="تخفیف نقدی" Binding="{Binding CashDiscountText}" Width="1*" ElementStyle="{StaticResource TableNumber}"/></DataGrid.Columns></DataGrid>
 </DockPanel>
 </TabItem>
 <TabItem Header="گزارش‌ها">
@@ -172,7 +171,7 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft">
-<StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
@@ -269,39 +268,39 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel>
-<StackPanel HorizontalAlignment="Stretch" FlowDirection="LeftToRight">
+<StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}"/>
 <TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
 <UniformGrid Columns="2" Margin="0,16,0,0">
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
 <StackPanel>
-<StackPanel FlowDirection="LeftToRight">
+<StackPanel FlowDirection="RightToLeft">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
 <Border x:Name="AutoBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
 <TextBlock x:Name="AutoBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
-<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" VerticalAlignment="Center"/>
+<TextBlock Text="پشتیبان خودکار" Style="{StaticResource CardTitle}" FlowDirection="RightToLeft" TextAlignment="Right" VerticalAlignment="Center"/>
 </StackPanel>
 <TextBlock x:Name="AutoBackupState" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
-<TextBlock x:Name="LastAutoBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock x:Name="LastAutoBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,0" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <CheckBox x:Name="AutoBackup" Content="فعال‌سازی پشتیبان خودکار هنگام خروج" Checked="AutoBackupChanged" Unchecked="AutoBackupChanged" Margin="0,13,0,0"/>
-<TextBlock Text="۸ نسخهٔ خودکار آخر نگه‌داری می‌شود." Style="{StaticResource MutedText}" Margin="0,5,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="۸ نسخهٔ خودکار آخر نگه‌داری می‌شود." Style="{StaticResource MutedText}" Margin="0,5,0,0" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="6,0,0,0">
 <StackPanel>
-<StackPanel FlowDirection="LeftToRight">
+<StackPanel FlowDirection="RightToLeft">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Top">
 <Border x:Name="ManualBackupBadge" Background="#EEF2F6" CornerRadius="12" Padding="9,4" Margin="0,0,9,0" VerticalAlignment="Top">
 <TextBlock x:Name="ManualBackupBadgeText" FontWeight="SemiBold" Foreground="#475467"/>
 </Border>
-<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="LeftToRight" TextAlignment="Right" VerticalAlignment="Center"/>
+<TextBlock Text="پشتیبان دستی و بازیابی" Style="{StaticResource CardTitle}" FlowDirection="RightToLeft" TextAlignment="Right" VerticalAlignment="Center"/>
 </StackPanel>
 <TextBlock Text="ذخیره یا بازیابی نسخهٔ اطلاعات در زمان دلخواه" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,6,0,0" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
-<TextBlock x:Name="LastManualBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,8" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock x:Name="LastManualBackup" Style="{StaticResource MutedText}" TextWrapping="Wrap" Margin="0,8,0,8" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,14,6,4">
 <Button Content="ذخیره نسخه پشتیبان" Click="Backup" Style="{StaticResource Primary}"/>
 <Button Content="بازیابی پشتیبان" Click="Restore"/>
@@ -320,16 +319,16 @@
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch" Padding="30" MinHeight="174">
-<DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-<Grid DockPanel.Dock="Right" FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Center">
+<DockPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+<Grid DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="Auto"/>
 <ColumnDefinition Width="160"/>
 </Grid.ColumnDefinitions>
-<StackPanel Grid.Column="0" Margin="0,0,32,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="LeftToRight">
-<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight"/>
-<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="0,7,0,0"/>
-<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="0,9,0,0"/>
+<StackPanel Grid.Column="0" Margin="0,0,32,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft">
+<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft"/>
+<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
+<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
 </StackPanel>
 <Border Grid.Column="1" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Image Source="pack://application:,,,/Assets/webilo-logo.png" Width="100" Height="100" Stretch="Uniform"/>
@@ -338,26 +337,26 @@
 </DockPanel>
 </Border>
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
-<StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
-<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="LeftToRight" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,7,0,0"/>
+<StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
+<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,7,0,0"/>
 <UniformGrid Columns="3" Margin="0,18,0,0">
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="0,0,5,0">
 <StackPanel>
 <TextBlock Text="سازمان" Style="{StaticResource MutedText}"/>
-<TextBlock Text="شرکت متحد توزیع ایرانیان" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="شرکت متحد توزیع ایرانیان" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="5,0">
 <StackPanel>
 <TextBlock Text="حریم داده‌ها" Style="{StaticResource MutedText}"/>
-<TextBlock Text="داده‌ها فقط روی همین رایانه ذخیره می‌شوند" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="داده‌ها فقط روی همین رایانه ذخیره می‌شوند" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="5,0,0,0">
 <StackPanel>
 <TextBlock Text="اطلاعات نسخه" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="AboutVersion" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock x:Name="AboutVersion" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,6,0,0" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 </Border>
 </UniformGrid>

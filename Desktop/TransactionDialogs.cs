@@ -9,7 +9,7 @@ namespace Profit.Desktop;
 
 static class DialogUi
 {
-    public static TextBox Input(string value = "") => new() { Text = value, FlowDirection = FlowDirection.LeftToRight, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 3, 0, 8) };
+    public static TextBox Input(string value = "") => new() { Text = value, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 3, 0, 8) };
     public static TextBlock Label(string text) => new() { Text = text, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch };
     public static string Today()
     {
@@ -20,7 +20,7 @@ static class DialogUi
     public static Border Header(string title, string note) => new()
     {
         Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16),
-        Child = new StackPanel { FlowDirection = FlowDirection.LeftToRight, Children =
+        Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, Children =
         {
             new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch },
             new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, TextWrapping = TextWrapping.Wrap }
@@ -115,8 +115,9 @@ public sealed class PendingBrandDialog : Window
 
         panel.Children.Add(new TextBlock { Text = "برند ثبت‌شده", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 22, 0, 2), TextAlignment = TextAlignment.Right });
         var brand = new ComboBox { IsEditable = true, IsTextSearchEnabled = true, ItemsSource = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList(), HorizontalContentAlignment = HorizontalAlignment.Right, Height = 34, ToolTip = "نام برند را انتخاب یا جست‌وجو کنید" };
+        brand.SelectionChanged += (_, _) => { if (brand.SelectedItem is string selectedBrand) brand.Text = selectedBrand; };
         panel.Children.Add(brand);
-        panel.Children.Add(new TextBlock { Text = "اگر برند موردنظر وجود ندارد، ابتدا آن را از دکمه «مدیریت برندها» در صفحه اصلی با درصدهایش ثبت کنید.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 12) });
+        panel.Children.Add(new TextBlock { Text = "اگر برند موردنظر وجود ندارد، ابتدا آن را از دکمه «+ افزودن برند» با درصدهایش ثبت کنید.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 12) });
 
         var defaultPrefix = Rules.Digits(selected.Code); defaultPrefix = defaultPrefix[..Math.Min(3, defaultPrefix.Length)];
         var applyPrefix = new CheckBox { Content = "همه کدهای ناشناخته با این پیشوند را هم پردازش کن و قانون برند را ذخیره کن", Margin = new Thickness(0, 6, 0, 5), HorizontalAlignment = HorizontalAlignment.Right };
@@ -147,7 +148,7 @@ public sealed class PendingBrandDialog : Window
         {
             var name = Rules.Normalize(brand.Text);
             if (string.IsNullOrWhiteSpace(name)) { error.Text = "یک برند ثبت‌شده را انتخاب کنید."; return; }
-            if (!brands.Any(x => Rules.Normalize(x.Name).Equals(name, StringComparison.OrdinalIgnoreCase))) { error.Text = "این برند ثبت نشده است. ابتدا آن را در مدیریت برندها ایجاد کنید."; return; }
+            if (!brands.Any(x => Rules.Normalize(x.Name).Equals(name, StringComparison.OrdinalIgnoreCase))) { error.Text = "این برند ثبت نشده است. ابتدا آن را از بخش برندها اضافه کنید."; return; }
             var values = BrandPrefixRules.Parse(prefix.Text);
             if (applyPrefix.IsChecked == true && values.Count != 1) { error.Text = "برای ثبت قانون، یک پیشوند عددی وارد کنید."; return; }
             Value = new PendingBrandResolution(name, values.FirstOrDefault() ?? "", applyPrefix.IsChecked == true); DialogResult = true;
@@ -318,7 +319,7 @@ public sealed class PurchaseDialog : Window
             if (detected != null) brand.Text = detected.Name;
         }
         codeBox.LostFocus += (_, _) => Fill(); Fill();
-        save.Click += (_, _) => { try { var normalizedCode = Rules.Normalize(codeBox.Text); var selectedBrand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brand.Text)) ?? throw new InvalidDataException("ابتدا برند کالا را در بخش مدیریت برند ثبت کنید."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); var total = q * price; Item = new CatalogItem { Code = normalizedCode, Name = Rules.Normalize(name.Text), Brand = selectedBrand.Name }; Rules.Validate(Item); Value = new Purchase { Date = Rules.Digits(date.Text), Code = Item.Code, Supplier = Rules.Normalize(supplier.Text), Quantity = q, UnitPrice = price, Total = total, Deductions = Rules.Number(deductions.Text), BrandDiscount = adjustment ? 0 : selectedBrand.PurchaseDiscount, Offer = adjustment ? 0 : selectedBrand.Offer, IsAdjustment = adjustment, Note = adjustment ? "تعدیل موجودی ناشی از مغایرت" : "ثبت دستی" }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        save.Click += (_, _) => { try { var normalizedCode = Rules.Normalize(codeBox.Text); var selectedBrand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brand.Text)) ?? throw new InvalidDataException("ابتدا برند کالا را در بخش برندها ثبت کنید."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); var total = q * price; Item = new CatalogItem { Code = normalizedCode, Name = Rules.Normalize(name.Text), Brand = selectedBrand.Name }; Rules.Validate(Item); Value = new Purchase { Date = Rules.Digits(date.Text), Code = Item.Code, Supplier = Rules.Normalize(supplier.Text), Quantity = q, UnitPrice = price, Total = total, Deductions = Rules.Number(deductions.Text), BrandDiscount = adjustment ? 0 : selectedBrand.PurchaseDiscount, Offer = adjustment ? 0 : selectedBrand.Offer, IsAdjustment = adjustment, Note = adjustment ? "تعدیل موجودی ناشی از مغایرت" : "ثبت دستی" }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
     }
 }
 
@@ -352,5 +353,74 @@ public sealed class SaleDialog : Window
         }
         code.LostFocus += (_, _) => Suggest();
         save.Click += (_, _) => { try { var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کد کالا ناشناخته است. ابتدا تعدیل موجودی آن را ثبت کنید."); var profile = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand)) ?? throw new InvalidDataException("برند کالا یافت نشد."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); Value = new Sale { Date = Rules.Digits(date.Text), Code = item.Code, Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text), CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+    }
+}
+
+// ویرایش فروش باید اثر واقعی آن بر FIFO را پیش از ثبت نشان دهد؛ بنابراین هر تغییر،
+// کل دفتر را با جایگزینی همین ردیف دوباره محاسبه می‌کند.
+public sealed class SaleEditorDialog : Window
+{
+    readonly Ledger ledger;
+    readonly Sale original;
+    readonly TextBox date;
+    readonly TextBox customer;
+    readonly TextBox quantity;
+    readonly TextBox unitPrice;
+    readonly TextBox deductions;
+    readonly TextBlock preview = new() { TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, LineHeight = 27 };
+    readonly TextBlock error = new() { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right };
+    public Sale? Value { get; private set; }
+
+    public SaleEditorDialog(Ledger ledger, Sale original)
+    {
+        this.ledger = ledger; this.original = original;
+        var item = ledger.Items.First(x => x.Code.Equals(original.Code, StringComparison.OrdinalIgnoreCase));
+        Title = "ویرایش فروش"; Width = 760; Height = 700; MinWidth = 640; MinHeight = 590; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.RightToLeft; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
+        root.Children.Add(DialogUi.Header("ویرایش فروش", "با هر تغییر، بهای FIFO و سود این فروش بر اساس کل گردش کالا دوباره محاسبه می‌شود."));
+
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var panel = new StackPanel { Margin = new Thickness(26, 18, 26, 12) }; scroll.Content = panel;
+        panel.Children.Add(new TextBlock { Text = $"{item.Brand}  |  {item.Name}  |  کد کالا: {item.Code}", FontSize = 16, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
+
+        var fields = new Grid { Margin = new Thickness(0, 16, 0, 8) }; fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(fields);
+        date = DialogUi.Input(original.Date); customer = DialogUi.Input(original.Customer); quantity = DialogUi.Input(Rules.Money(original.Quantity)); unitPrice = DialogUi.Input(Rules.Money(original.UnitPrice)); deductions = DialogUi.Input(Rules.Money(original.Deductions));
+        void Field(int column, int row, string label, TextBox box)
+        {
+            while (fields.RowDefinitions.Count <= row) fields.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var stack = new StackPanel { Margin = new Thickness(6, 0, 6, 0) }; stack.Children.Add(DialogUi.Label(label)); stack.Children.Add(box); Grid.SetColumn(stack, column); Grid.SetRow(stack, row); fields.Children.Add(stack);
+        }
+        Field(1, 0, "تاریخ", date); Field(0, 0, "مشتری", customer); Field(1, 1, "تعداد", quantity); Field(0, 1, "قیمت فروش واحد — ریال", unitPrice); Field(1, 2, "کسورات — ریال", deductions);
+        MoneyInput.Attach(quantity); MoneyInput.Attach(unitPrice); MoneyInput.Attach(deductions);
+
+        var previewBox = new Border { Style = (Style)FindResource("Panel"), Margin = new Thickness(0, 12, 0, 0), Child = new StackPanel() };
+        var previewPanel = (StackPanel)previewBox.Child; previewPanel.Children.Add(new TextBlock { Text = "پیش‌نمایش محاسبه", FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right }); previewPanel.Children.Add(preview); panel.Children.Add(previewBox); panel.Children.Add(error);
+
+        var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(26, 0, 26, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
+        var cancel = new Button { Content = "انصراف" }; var save = new Button { Content = "ثبت تغییرات", Style = (Style)FindResource("Primary") }; footer.Children.Add(save); footer.Children.Add(cancel);
+
+        Sale ReadValue()
+        {
+            var q = Rules.Number(quantity.Text); var price = Rules.Number(unitPrice.Text);
+            var value = original with { Date = Rules.Digits(date.Text), Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text) };
+            Rules.Validate(value); return value;
+        }
+        void UpdatePreview()
+        {
+            try
+            {
+                var value = ReadValue();
+                var sales = ledger.Sales.Select(x => x.Id == original.Id ? value : x).ToList();
+                var settled = LedgerCalculator.Calculate(ledger with { Sales = sales }).Sales[value.Id];
+                preview.Text = $"فروش پس از کسورات: {Rules.Money(Rules.NetSaleBase(value))} ریال\nتخفیف نقدی: {Rules.Money(Rules.CashDiscountAmount(value))} ریال\nدریافتی نقدی: {Rules.Money(settled.Cash)} ریال\nفروش چکی: {Rules.Money(settled.Credit)} ریال\nبهای FIFO: {Rules.Money(settled.Cost)} ریال\nسود ناخالص: {Rules.Money(settled.Profit)} ریال" + (settled.Shortage > 0 ? $"\nکسری تأییدنشده: {Rules.Money(settled.Shortage)} عدد" : "");
+                error.Text = "";
+            }
+            catch (Exception ex) { preview.Text = "برای نمایش پیش‌نمایش، همهٔ مقادیر را به‌درستی وارد کنید."; error.Text = ex.Message; }
+        }
+        date.TextChanged += (_, _) => UpdatePreview(); customer.TextChanged += (_, _) => UpdatePreview(); quantity.TextChanged += (_, _) => UpdatePreview(); unitPrice.TextChanged += (_, _) => UpdatePreview(); deductions.TextChanged += (_, _) => UpdatePreview();
+        save.Click += (_, _) => { try { Value = ReadValue(); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        cancel.Click += (_, _) => DialogResult = false;
+        UpdatePreview();
     }
 }
