@@ -19,6 +19,7 @@
 <Setter Property="FontFamily" Value="{StaticResource Vazir}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Right"/>
 </Style>
   <Style TargetType="Button">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
@@ -182,7 +183,7 @@
 <Setter Property="Foreground" Value="{StaticResource Ink}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Stretch"/>
+<Setter Property="HorizontalAlignment" Value="Right"/>
 </Style>
   <Style x:Key="PageTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
 <Setter Property="FontSize" Value="20"/>
@@ -198,7 +199,7 @@
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Stretch"/>
+<Setter Property="HorizontalAlignment" Value="Right"/>
 </Style>
   <Style x:Key="TrendCheckBox" TargetType="CheckBox">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
@@ -232,7 +233,7 @@
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Stretch"/>
+<Setter Property="HorizontalAlignment" Value="Right"/>
 </Style>
 <Style TargetType="TabItem">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
