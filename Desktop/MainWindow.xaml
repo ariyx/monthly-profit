@@ -319,18 +319,18 @@
 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch" Padding="30" MinHeight="174">
-<DockPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch" VerticalAlignment="Center">
-<Grid DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right" VerticalAlignment="Center">
+<DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+<Grid DockPanel.Dock="Right" FlowDirection="LeftToRight" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Grid.ColumnDefinitions>
 <ColumnDefinition Width="Auto"/>
 <ColumnDefinition Width="160"/>
 </Grid.ColumnDefinitions>
-<StackPanel Grid.Column="1" Margin="0,0,32,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft">
+<StackPanel Grid.Column="0" Margin="0,0,32,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft">
 <TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft"/>
 <TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
 <TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
 </StackPanel>
-<Border Grid.Column="0" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Right" VerticalAlignment="Center">
+<Border Grid.Column="1" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Image Source="pack://application:,,,/Assets/webilo-logo.png" Width="100" Height="100" Stretch="Uniform"/>
 </Border>
 </Grid>

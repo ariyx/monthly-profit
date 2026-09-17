@@ -171,8 +171,9 @@
 </Setter>
 </Style>
   <Style x:Key="Panel" TargetType="Border">
-<!-- پانل‌های محتوایی فارسی‌اند؛ Gridهای نیازمند مختصات LTR آن را صریحاً تعیین می‌کنند. -->
-<Setter Property="FlowDirection" Value="RightToLeft"/>
+<!-- مختصات Grid و DockPanel باید ثابت بماند؛ راست‌چینی متن‌ها با TextAlignment
+     و کانتینرهای همان بخش انجام می‌شود، نه با آینه‌کردن کل پانل. -->
+<Setter Property="FlowDirection" Value="LeftToRight"/>
 <Setter Property="Background" Value="White"/>
 <Setter Property="BorderBrush" Value="#E4E8EF"/>
 <Setter Property="BorderThickness" Value="1"/>
