@@ -14,7 +14,7 @@ public sealed class InstallWindow : Window
     {
         Title = "نصب شرکت متحد توزیع ایرانیان"; Width = 540; Height = 390; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterScreen; FlowDirection = FlowDirection.LeftToRight;
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        var headerText = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch };
+        var headerText = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right };
         headerText.Children.Add(new TextBlock { Text = "شرکت متحد توزیع ایرانیان", FontSize = 23, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
         headerText.Children.Add(new TextBlock { Text = "نصب سامانه مدیریت سود ماهانه", Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 7, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft });
         root.Children.Add(new Border { Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(27, 22, 27, 20), FlowDirection = FlowDirection.RightToLeft, Child = headerText });

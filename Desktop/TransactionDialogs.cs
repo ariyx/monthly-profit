@@ -20,7 +20,7 @@ static class DialogUi
     public static Border Header(string title, string note) => new()
     {
         Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16),
-        Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, Children =
+        Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Children =
         {
             new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch },
             new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, TextWrapping = TextWrapping.Wrap }
@@ -383,11 +383,11 @@ public sealed class SaleEditorDialog : Window
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("ویرایش فروش", "با هر تغییر، بهای FIFO و سود این فروش بر اساس کل گردش کالا دوباره محاسبه می‌شود."));
 
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        var panel = new StackPanel { Margin = new Thickness(26, 18, 26, 12) }; scroll.Content = panel;
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var panel = new StackPanel { Margin = new Thickness(26, 18, 26, 12), HorizontalAlignment = HorizontalAlignment.Stretch }; scroll.Content = panel;
         panel.Children.Add(new TextBlock { Text = $"{item.Brand}  |  {item.Name}  |  کد کالا: {item.Code}", FontSize = 16, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
 
-        var fields = new Grid { Margin = new Thickness(0, 16, 0, 8) }; fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(fields);
+        var fields = new Grid { Margin = new Thickness(0, 16, 0, 8), FlowDirection = FlowDirection.LeftToRight }; fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(fields);
         date = DialogUi.Input(original.Date); customer = DialogUi.Input(original.Customer); quantity = DialogUi.Input(Rules.Money(original.Quantity)); unitPrice = DialogUi.Input(Rules.Money(original.UnitPrice)); deductions = DialogUi.Input(Rules.Money(original.Deductions));
         void Field(int column, int row, string label, TextBox box)
         {
@@ -397,7 +397,7 @@ public sealed class SaleEditorDialog : Window
         Field(1, 0, "تاریخ", date); Field(0, 0, "مشتری", customer); Field(1, 1, "تعداد", quantity); Field(0, 1, "قیمت فروش واحد — ریال", unitPrice); Field(1, 2, "کسورات — ریال", deductions);
         MoneyInput.Attach(quantity); MoneyInput.Attach(unitPrice); MoneyInput.Attach(deductions);
 
-        var previewBox = new Border { Style = (Style)FindResource("Panel"), Margin = new Thickness(0, 12, 0, 0), Child = new StackPanel() };
+        var previewBox = new Border { Style = (Style)FindResource("Panel"), Margin = new Thickness(0, 12, 0, 0), Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch } };
         var previewPanel = (StackPanel)previewBox.Child; previewPanel.Children.Add(new TextBlock { Text = "پیش‌نمایش محاسبه", FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right }); previewPanel.Children.Add(preview); panel.Children.Add(previewBox); panel.Children.Add(error);
 
         var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(26, 0, 26, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
