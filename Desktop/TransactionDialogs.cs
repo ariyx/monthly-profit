@@ -10,7 +10,7 @@ namespace Profit.Desktop;
 static class DialogUi
 {
     public static TextBox Input(string value = "") => new() { Text = value, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 3, 0, 8) };
-    public static TextBlock Label(string text) => new() { Text = text, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch };
+    public static TextBlock Label(string text) => new() { Text = text, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
     public static string Today()
     {
         var c = new PersianCalendar(); var d = DateTime.Today; return $"{c.GetYear(d):0000}{c.GetMonth(d):00}{c.GetDayOfMonth(d):00}";
@@ -20,10 +20,10 @@ static class DialogUi
     public static Border Header(string title, string note) => new()
     {
         Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16),
-        Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Children =
+        Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch, Children =
         {
-            new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch },
-            new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, TextWrapping = TextWrapping.Wrap }
+            new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft },
+            new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft, TextWrapping = TextWrapping.Wrap }
         }}
     };
 }
@@ -79,14 +79,23 @@ public sealed class BrandEditorDialog : Window
     {
         Title = brand == null ? "افزودن برند" : "ویرایش برند"; Width = 520; Height = 710; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
+        var root = new Grid { FlowDirection = FlowDirection.LeftToRight };
+        root.RowDefinitions.Add(new RowDefinition());
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var bodyScroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 12), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch };
+        bodyScroll.Content = panel; Grid.SetRow(bodyScroll, 0); root.Children.Add(bodyScroll);
+        var footer = new Border { Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(228, 232, 239)), BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(26, 10, 26, 12) };
+        Grid.SetRow(footer, 1); root.Children.Add(footer); Content = root;
         panel.Children.Add(DialogUi.Label("نام برند")); var name = DialogUi.Input(brand?.Name ?? ""); panel.Children.Add(name);
         panel.Children.Add(DialogUi.Label("پیشوند کد کالا")); var prefixes = DialogUi.Input(BrandPrefixRules.Display(brand?.CodePrefixes ?? [])); prefixes.ToolTip = "مثال: 106 یا 115، 145"; panel.Children.Add(prefixes);
         panel.Children.Add(new TextBlock { Text = "هر پیشوند را فقط با رقم وارد کنید؛ چند پیشوند را با «،» جدا کنید. مثلاً 106 همهٔ کدهای شروع‌شونده با 106 را به این برند متصل می‌کند.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, Margin = new Thickness(0, -3, 0, 7) });
         var inputs = new Dictionary<string, TextBox>();
         void Rate(string key, string label, decimal value) { panel.Children.Add(DialogUi.Label(label)); var t = DialogUi.Input(); DialogUi.Percent(t, value); inputs[key] = t; panel.Children.Add(t); }
         Rate("discount", "تخفیف خرید ٪", brand?.PurchaseDiscount ?? 0); Rate("offer", "آفر خرید ٪", brand?.Offer ?? 0); Rate("markup", "سود / مارک‌آپ ٪", brand?.Markup ?? .04m); Rate("cash", "سهم فروش نقدی ٪", brand?.CashShare ?? .30m); Rate("credit", "سهم فروش چکی ٪", brand?.CreditShare ?? .70m); Rate("cashdiscount", "تخفیف نقدی ٪", brand?.CashDiscount ?? .05m);
-        var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error); var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(save);
+        var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(error);
+        var actions = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right };
+        var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary") }; actions.Children.Add(save); footer.Child = actions;
         save.Click += (_, _) => { try { Value = new Brand { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text), PurchaseDiscount = DialogUi.Percent(inputs["discount"]), Offer = DialogUi.Percent(inputs["offer"]), Markup = DialogUi.Percent(inputs["markup"]), CashShare = DialogUi.Percent(inputs["cash"]), CreditShare = DialogUi.Percent(inputs["credit"]), CashDiscount = DialogUi.Percent(inputs["cashdiscount"]) }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
     }
 }
@@ -108,7 +117,7 @@ public sealed class PendingBrandDialog : Window
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("تعیین برند کد ناشناخته", "ابتدا برند را انتخاب کنید. فقط در صورتی که از الگوی کد مطمئن هستید، قانون پیشوند را هم ثبت کنید."));
 
-        var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 12) }; Grid.SetRow(panel, 1); root.Children.Add(panel);
+        var panel = new StackPanel { Margin = new Thickness(26, 20, 26, 12), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; Grid.SetRow(panel, 1); root.Children.Add(panel);
         panel.Children.Add(new TextBlock { Text = $"کد کالا: {selected.Code}", FontSize = 18, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right });
         panel.Children.Add(new TextBlock { Text = selected.Name, FontSize = 15, Margin = new Thickness(0, 5, 0, 3), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(new TextBlock { Text = $"در صف: {selected.PurchaseRows} ردیف خرید و {selected.SaleRows} ردیف فروش · اولین تاریخ: {selected.FirstDate}", Foreground = new SolidColorBrush(Color.FromRgb(84, 98, 124)), TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
@@ -199,16 +208,16 @@ public sealed class ReconciliationDialog : Window
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("رسیدگی به مغایرت موجودی", "تعدیل در تاریخ اولین کسری ثبت می‌شود و در همان روز، پیش از فروش محاسبه خواهد شد."));
 
-        var content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         Grid.SetRow(content, 1); root.Children.Add(content);
-        var panel = new StackPanel { Margin = new Thickness(24, 18, 24, 12) }; content.Content = panel;
+        var panel = new StackPanel { Margin = new Thickness(24, 18, 24, 12), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; content.Content = panel;
         panel.Children.Add(new TextBlock { Text = $"{candidate.Brand}  |  {candidate.Name}  |  کد کالا: {candidate.Code}", FontSize = 16, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right });
         panel.Children.Add(current);
         panel.Children.Add(new TextBlock { Text = "ثبت یا ویرایش تعدیل", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 18, 0, 7), TextAlignment = TextAlignment.Right });
-        var inputs = new Grid(); for (var i = 0; i < 4; i++) inputs.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(inputs);
+        var inputs = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch }; for (var i = 0; i < 4; i++) inputs.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(inputs);
         void Input(int column, string label, TextBox box, string hint)
         {
-            var stack = new StackPanel { Margin = new Thickness(5, 0, 5, 0) }; stack.Children.Add(DialogUi.Label(label)); box.ToolTip = hint; stack.Children.Add(box); Grid.SetColumn(stack, column); inputs.Children.Add(stack);
+            var stack = new StackPanel { Margin = new Thickness(5, 0, 5, 0), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; stack.Children.Add(DialogUi.Label(label)); box.ToolTip = hint; stack.Children.Add(box); Grid.SetColumn(stack, column); inputs.Children.Add(stack);
         }
         Input(3, "تاریخ تعدیل", date, "مانند 14050612"); Input(2, "تعداد تعدیل", quantity, "حداکثر کسری باقی‌مانده"); Input(1, "قیمت واحد — ریال", unitPrice, "پیشنهاد از آخرین خرید"); Input(0, "یادداشت", note, "اختیاری");
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 2, 0, 8) }; panel.Children.Add(actions);
@@ -303,7 +312,7 @@ public sealed class PurchaseDialog : Window
     {
         Title = adjustment ? "تعدیل موجودی" : "ثبت خرید"; Width = 640; Height = 690; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
+        var panel = new StackPanel { Margin = new Thickness(26), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; Content = panel;
         panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(dateValue ?? DialogUi.Today()); panel.Children.Add(date);
         panel.Children.Add(DialogUi.Label("کد کالا")); var codeBox = DialogUi.Input(code ?? ""); panel.Children.Add(codeBox);
         panel.Children.Add(DialogUi.Label("نام کالا")); var name = DialogUi.Input(); panel.Children.Add(name);
@@ -333,7 +342,7 @@ public sealed class SaleDialog : Window
     {
         Title = "ثبت فروش"; Width = 640; Height = 610; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var panel = new StackPanel { Margin = new Thickness(26) }; Content = panel;
+        var panel = new StackPanel { Margin = new Thickness(26), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; Content = panel;
         panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(DialogUi.Today()); panel.Children.Add(date);
         panel.Children.Add(DialogUi.Label("کد کالا")); var code = DialogUi.Input(); panel.Children.Add(code);
         panel.Children.Add(DialogUi.Label("مشتری")); var customer = DialogUi.Input(); panel.Children.Add(customer);
@@ -384,7 +393,7 @@ public sealed class SaleEditorDialog : Window
         root.Children.Add(DialogUi.Header("ویرایش فروش", "با هر تغییر، بهای FIFO و سود این فروش بر اساس کل گردش کالا دوباره محاسبه می‌شود."));
 
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        var panel = new StackPanel { Margin = new Thickness(26, 18, 26, 12), HorizontalAlignment = HorizontalAlignment.Stretch }; scroll.Content = panel;
+        var panel = new StackPanel { Margin = new Thickness(26, 18, 26, 12), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; scroll.Content = panel;
         panel.Children.Add(new TextBlock { Text = $"{item.Brand}  |  {item.Name}  |  کد کالا: {item.Code}", FontSize = 16, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right, TextWrapping = TextWrapping.Wrap });
 
         var fields = new Grid { Margin = new Thickness(0, 16, 0, 8), FlowDirection = FlowDirection.LeftToRight }; fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); fields.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(fields);
@@ -392,7 +401,7 @@ public sealed class SaleEditorDialog : Window
         void Field(int column, int row, string label, TextBox box)
         {
             while (fields.RowDefinitions.Count <= row) fields.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var stack = new StackPanel { Margin = new Thickness(6, 0, 6, 0) }; stack.Children.Add(DialogUi.Label(label)); stack.Children.Add(box); Grid.SetColumn(stack, column); Grid.SetRow(stack, row); fields.Children.Add(stack);
+            var stack = new StackPanel { Margin = new Thickness(6, 0, 6, 0), FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch }; stack.Children.Add(DialogUi.Label(label)); stack.Children.Add(box); Grid.SetColumn(stack, column); Grid.SetRow(stack, row); fields.Children.Add(stack);
         }
         Field(1, 0, "تاریخ", date); Field(0, 0, "مشتری", customer); Field(1, 1, "تعداد", quantity); Field(0, 1, "قیمت فروش واحد — ریال", unitPrice); Field(1, 2, "کسورات — ریال", deductions);
         MoneyInput.Attach(quantity); MoneyInput.Attach(unitPrice); MoneyInput.Attach(deductions);
