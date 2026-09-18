@@ -7,25 +7,35 @@ public static class ReconciliationPlanner
 {
     public static List<ReconciliationCandidate> Find(Ledger baseline, IEnumerable<Sale> sales)
     {
-        var staged = baseline;
+        var ordered = sales.OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal).ToList();
+        if (ordered.Count == 0) return [];
+        var calculation = LedgerCalculator.Calculate(baseline with { Sales = [.. baseline.Sales, .. ordered] });
+        return FromCalculation(baseline, ordered, calculation);
+    }
+
+    static List<ReconciliationCandidate> FromCalculation(Ledger baseline, IEnumerable<Sale> sales, LedgerCalculation calculation)
+    {
+        var items = baseline.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var groups = new Dictionary<string, (CatalogItem Item, string FirstDate, decimal Quantity, int Rows)> (StringComparer.OrdinalIgnoreCase);
         foreach (var sale in sales.OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal))
         {
-            var preview = LedgerCalculator.PreviewSale(staged, sale);
-            if (preview.Shortage > 0)
+            var settlement = calculation.Sales[sale.Id];
+            if (settlement.Shortage > 0)
             {
-                var item = staged.Items.Single(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase));
-                if (groups.TryGetValue(sale.Code, out var group)) groups[sale.Code] = (group.Item, group.FirstDate, group.Quantity + preview.Shortage, group.Rows + 1);
-                else groups[sale.Code] = (item, sale.Date, preview.Shortage, 1);
+                var item = items[sale.Code];
+                if (groups.TryGetValue(sale.Code, out var group)) groups[sale.Code] = (group.Item, group.FirstDate, group.Quantity + settlement.Shortage, group.Rows + 1);
+                else groups[sale.Code] = (item, sale.Date, settlement.Shortage, 1);
             }
-            staged = staged with { Sales = [.. staged.Sales, sale] };
         }
         return groups.Values.Select(x => new ReconciliationCandidate(x.Item.Code, x.Item.Name, x.Item.Brand, x.FirstDate, x.Quantity, SuggestedUnitCost(baseline, x.Item.Code, x.FirstDate), x.Rows))
             .OrderBy(x => x.FirstDate, StringComparer.Ordinal).ThenBy(x => x.Code, StringComparer.Ordinal).ToList();
     }
 
     public static List<ReconciliationCandidate> Existing(Ledger ledger)
-        => Find(ledger with { Sales = [] }, ledger.Sales);
+        => Existing(ledger, LedgerCalculator.Calculate(ledger));
+
+    public static List<ReconciliationCandidate> Existing(Ledger ledger, LedgerCalculation calculation)
+        => FromCalculation(ledger with { Sales = [] }, ledger.Sales, calculation);
 
     public static decimal SuggestedUnitCost(Ledger ledger, string code, string date)
     {

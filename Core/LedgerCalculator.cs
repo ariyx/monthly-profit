@@ -73,8 +73,12 @@ public static class LedgerCalculator
     }
 
     public static LedgerTotal SummarizeMonth(Ledger ledger, Month month)
+        => SummarizeMonth(ledger, month, Calculate(ledger));
+
+    // Callers that already calculated the ledger can reuse the same immutable
+    // snapshot instead of repeating the full FIFO pass for every view/month.
+    public static LedgerTotal SummarizeMonth(Ledger ledger, Month month, LedgerCalculation calculation)
     {
-        var calculation = Calculate(ledger);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == month.Key).ToList();
         var settled = sales.Select(x => calculation.Sales[x.Id]).ToList();
         var codes = sales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();

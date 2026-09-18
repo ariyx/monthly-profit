@@ -51,10 +51,14 @@ try
     };
     var calculation = LedgerCalculator.Calculate(ledger); var settlement = calculation.Sales["s1"];
     Equal(settlement.Cost, 700m, "FIFO cost uses oldest purchase"); Equal(settlement.Cash, 313.5m, "cash discount only reduces cash share"); Equal(settlement.Credit, 770m, "credit share retained"); Equal(settlement.Profit, 383.5m, "ledger profit"); Equal(calculation.Stock.Single().Quantity, 4m, "rolling inventory");
-    var monthTotal = LedgerCalculator.SummarizeMonth(ledger, new Month { Key = "1405/04" }); Equal(monthTotal.InvoiceSales, 1100m, "invoice sales after deductions"); Equal(monthTotal.CashDiscountAmount, 16.5m, "cash discount is explicit");
+    var month = new Month { Key = "1405/04" }; var monthTotal = LedgerCalculator.SummarizeMonth(ledger, month); var cachedMonthTotal = LedgerCalculator.SummarizeMonth(ledger, month, calculation);
+    Equal(monthTotal, cachedMonthTotal, "cached month summary matches standalone calculation"); Equal(monthTotal.InvoiceSales, 1100m, "invoice sales after deductions"); Equal(monthTotal.CashDiscountAmount, 16.5m, "cash discount is explicit");
     Equal(LedgerCalculator.CalculateAtEndOfMonth(ledger, "1405/03").Stock.Single().Quantity, 5m, "inventory snapshot excludes future purchases and sales");
     var shortage = LedgerCalculator.PreviewSale(ledger, new Sale { Id = "s2", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m });
     Equal(shortage.Shortage, 2m, "shortage is surfaced for manual reconciliation");
+    var shortageSale = new Sale { Id = "s2", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m };
+    var shortageLedger = ledger with { Sales = [.. ledger.Sales, shortageSale] }; var shortageCalculation = LedgerCalculator.Calculate(shortageLedger);
+    var cachedReconciliation = ReconciliationPlanner.Existing(shortageLedger, shortageCalculation); Equal(cachedReconciliation.Single().Quantity, 2m, "cached reconciliation matches FIFO shortage");
     var reconciliation = ReconciliationPlanner.Find(ledger, [new Sale { Id = "s3", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }]);
     Equal(reconciliation.Count, 1, "reconciliation groups shortages by code"); Equal(reconciliation[0].Quantity, 2m, "reconciliation quantity");
     var adjustments = ReconciliationPlanner.CreateAdjustments(reconciliation, new Dictionary<string, decimal> { [item.Code] = 200m });

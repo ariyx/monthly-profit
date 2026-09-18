@@ -19,7 +19,9 @@ public partial class MainWindow : Window
     Month current = new();
     bool loading;
     Preferences preferences = new();
+    LedgerCalculation calculation = new();
     List<Month> reportMonths = [];
+    List<LedgerTotal> reportTotals = [];
     List<ReconciliationCandidate> reconciliationCandidates = [];
     List<PendingBrandGridRow> pendingBrandRows = [];
     List<PurchaseGridRow> purchaseRows = [];
@@ -33,7 +35,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱۸ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱۹ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -84,12 +86,15 @@ public partial class MainWindow : Window
     }
     void Draw()
     {
-        var t = LedgerCalculator.SummarizeMonth(ledger, current); Sales.Text = Rules.ReportMoney(t.Sales); Profit.Text = Rules.ReportMoney(t.Profit); Net.Text = Rules.ReportMoney(t.Net);
+        calculation = LedgerCalculator.Calculate(ledger);
+        var closingStock = LedgerCalculator.CalculateAtEndOfMonth(ledger, current.Key).Stock.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        var openingStock = LedgerCalculator.CalculateAtEndOfMonth(ledger, PreviousMonth(current.Key)).Stock.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        var t = LedgerCalculator.SummarizeMonth(ledger, current, calculation); Sales.Text = Rules.ReportMoney(t.Sales); Profit.Text = Rules.ReportMoney(t.Profit); Net.Text = Rules.ReportMoney(t.Net);
         var color = t.Net < 0 ? Brushes.Firebrick : t.Net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; Net.Foreground = color; NetLabel.Text = Outcome(t.Net); NetLabel.Foreground = color;
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.Firebrick : Brushes.SeaGreen;
         MarginLabel.Text = "حاشیه سود کل: " + Rules.Percent(t.Margin); Fixed.Text = Rules.Money(current.FixedCost);
         Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(t.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(t.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(t.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(t.Credit)} ریال\nبهای تمام‌شده فروش‌رفته: {Rules.ReportMoney(t.Cost)} ریال\nبرند: {t.Brands}   |   کالا: {t.Products}" + (t.Shortage > 0 ? $"\nمغایرت تأییدنشده: {Rules.Money(t.Shortage)} عدد؛ سود قطعی نیست." : "");
-        DrawTransactions(); DrawInventory(); DrawReconciliations(); DrawPendingBrands(); DrawBrandSettings(); DrawBrands(); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · {ledger.Purchases.Count} خرید و {ledger.Sales.Count} فروش ثبت شده";
+        DrawTransactions(calculation); DrawInventory(openingStock, closingStock); DrawReconciliations(calculation); DrawPendingBrands(); DrawBrandSettings(); DrawBrands(calculation, closingStock); DrawHistory(); DrawBackupStatus(); Status.Text = $"ماه {current.Key} · {ledger.Purchases.Count} خرید و {ledger.Sales.Count} فروش ثبت شده";
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
     void SaveMonth(Month next, string action)
@@ -384,7 +389,7 @@ public partial class MainWindow : Window
         state = state with { Items = result.Values.OrderBy(x => x.Code).ToList() };
         return result;
     }
-    void DrawTransactions()
+    void DrawTransactions(LedgerCalculation calc)
     {
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var purchases = ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToList();
@@ -392,7 +397,6 @@ public partial class MainWindow : Window
         SetBrandFilter(PurchaseBrandFilter, purchaseRows.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase));
         ApplyPurchaseFilter();
 
-        var calc = LedgerCalculator.Calculate(ledger);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).ToList();
         saleRows = sales.Select(x => new SaleGridRow(x, items[x.Code], calc.Sales[x.Id])).ToList();
         SetBrandFilter(SaleBrandFilter, saleRows.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase));
@@ -406,10 +410,8 @@ public partial class MainWindow : Window
         return $"{year:0000}/{month:00}";
     }
 
-    void DrawInventory()
+    void DrawInventory(IReadOnlyDictionary<string, StockRow> opening, IReadOnlyDictionary<string, StockRow> closing)
     {
-        var closing = LedgerCalculator.CalculateAtEndOfMonth(ledger, current.Key).Stock.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var opening = LedgerCalculator.CalculateAtEndOfMonth(ledger, PreviousMonth(current.Key)).Stock.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var purchases = ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == current.Key).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity), StringComparer.OrdinalIgnoreCase);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Sum(y => y.Quantity), StringComparer.OrdinalIgnoreCase);
         var codes = opening.Keys.Concat(closing.Keys).Concat(purchases.Keys).Concat(sales.Keys).Distinct(StringComparer.OrdinalIgnoreCase);
@@ -419,9 +421,9 @@ public partial class MainWindow : Window
         InventorySummary.Text = $"{rows.Count} کالا · موجودی پایان ماه: {Rules.Money(rows.Sum(x => x.Closing))} عدد · ارزش موجودی: {Rules.ReportMoney(rows.Sum(x => x.Cost))} ریال";
     }
 
-    void DrawReconciliations()
+    void DrawReconciliations(LedgerCalculation calc)
     {
-        reconciliationCandidates = ReconciliationPlanner.Existing(ledger);
+        reconciliationCandidates = ReconciliationPlanner.Existing(ledger, calc);
         ApplyReconciliationFilter();
         ReconciliationSummary.Text = reconciliationCandidates.Count == 0 ? "همه فروش‌ها با موجودی قابل‌ردیابی پوشش داده شده‌اند." : $"{reconciliationCandidates.Count} کد کالا، در مجموع {Rules.Money(reconciliationCandidates.Sum(x => x.Quantity))} عدد کسری دارد. برای رسیدگی یا ویرایش تعدیل‌های قبلی، روی ردیف کالا دوبار کلیک کنید.";
     }
@@ -452,33 +454,33 @@ public partial class MainWindow : Window
         BrandSettingsGrid.ItemsSource = ledger.Brands.OrderBy(x => x.Name).Select(x => new BrandSettingsRow(x)).ToList();
         BrandSummary.Text = $"{ledger.Brands.Count} برند فعال؛ پیشوند کد، برند کالاهای واردشده را تعیین می‌کند و درصدها برای ثبت‌های دستی و محاسبه سهم نقدی/چکی استفاده می‌شوند.";
     }
-    List<ItemMonthRow> ItemRows()
+    List<ItemMonthRow> ItemRows(LedgerCalculation calc, IReadOnlyDictionary<string, StockRow> stock)
     {
-        var calc = LedgerCalculator.Calculate(ledger); var stock = LedgerCalculator.CalculateAtEndOfMonth(ledger, current.Key).Stock.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var purchases = ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == current.Key).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.Sum(Rules.NetPurchase), StringComparer.OrdinalIgnoreCase);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase).ToDictionary(x => x.Key, x => x.ToList(), StringComparer.OrdinalIgnoreCase);
         return ledger.Items.Where(x => purchases.ContainsKey(x.Code) || sales.ContainsKey(x.Code) || stock.ContainsKey(x.Code)).Select(item => { var saleList = sales.GetValueOrDefault(item.Code, []); var settled = saleList.Select(x => calc.Sales[x.Id]).ToList(); var s = stock.GetValueOrDefault(item.Code); return new ItemMonthRow(item, s?.Quantity ?? 0, purchases.GetValueOrDefault(item.Code), settled.Sum(x => x.Sales), settled.Sum(x => x.Cost), settled.Sum(x => x.Profit), settled.Sum(x => x.Shortage)); }).OrderBy(x => x.Brand).ThenBy(x => x.Code).ToList();
     }
-    void DrawBrands()
+    void DrawBrands(LedgerCalculation calc, IReadOnlyDictionary<string, StockRow> stock)
     {
-        var groups = ItemRows().GroupBy(x => x.Brand).Select(g => new BrandRow(g.Key, g.Count(), g.Sum(x => x.Sales), g.Sum(x => x.Profit), g.Sum(x => x.Shortage))).OrderByDescending(x => x.Profit).ToList(); foreach (var row in groups) row.Rank = 1 + groups.Count(x => x.Profit > row.Profit); BrandsGrid.ItemsSource = groups;
+        var groups = ItemRows(calc, stock).GroupBy(x => x.Brand).Select(g => new BrandRow(g.Key, g.Count(), g.Sum(x => x.Sales), g.Sum(x => x.Profit), g.Sum(x => x.Shortage))).OrderByDescending(x => x.Profit).ToList(); foreach (var row in groups) row.Rank = 1 + groups.Count(x => x.Profit > row.Profit); BrandsGrid.ItemsSource = groups;
     }
     void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
     void ClearHistoryFilter(object s, RoutedEventArgs e) { loading = true; HistoryFrom.SelectedItem = null; HistoryTo.SelectedItem = null; loading = false; DrawHistory(); }
-    LedgerTotal Total(Month month) => LedgerCalculator.SummarizeMonth(ledger, month);
+    LedgerTotal Total(Month month) => LedgerCalculator.SummarizeMonth(ledger, month, calculation);
     void DrawHistory()
     {
         var keys = store.Keys(); var from = HistoryFrom.SelectedItem as string; var to = HistoryTo.SelectedItem as string;
-        if (from != null && to != null && string.CompareOrdinal(from, to) > 0) { reportMonths = []; HistoryGrid.ItemsSource = Array.Empty<HistoryRow>(); HistorySummary.Text = "بازه ماه نامعتبر است."; DrawTrend(); return; }
-        reportMonths = keys.Where(k => (from == null || k.CompareTo(from) >= 0) && (to == null || k.CompareTo(to) <= 0)).OrderBy(k => k).Select(store.Load).ToList(); var totals = reportMonths.Select(Total).ToList(); HistoryGrid.ItemsSource = reportMonths.OrderByDescending(x => x.Key).Select(x => new HistoryRow(x, Total(x))).ToList();
-        var cost = totals.Sum(x => x.Cost); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit); var fixedCost = totals.Sum(x => x.FixedCost); var net = totals.Sum(x => x.Net); RangeSales.Text = Rules.ReportMoney(sales); RangeProfit.Text = Rules.ReportMoney(profit); RangeNet.Text = Rules.ReportMoney(net); RangeNet.Foreground = net < 0 ? Brushes.Firebrick : net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; RangeOutcome.Text = Outcome(net) + " نهایی"; HistorySummary.Text = reportMonths.Count == 0 ? "در این بازه ماهی ثبت نشده است." : $"{reportMonths.Count} ماه · بهای تمام‌شده: {Rules.ReportMoney(cost)} ریال · هزینه ثابت: {Rules.ReportMoney(fixedCost)} ریال · حاشیه سود: {Rules.Percent(sales == 0 ? null : profit / sales)}"; DrawTrend();
+        if (from != null && to != null && string.CompareOrdinal(from, to) > 0) { reportMonths = []; reportTotals = []; HistoryGrid.ItemsSource = Array.Empty<HistoryRow>(); HistorySummary.Text = "بازه ماه نامعتبر است."; DrawTrend(); return; }
+        reportMonths = keys.Where(k => (from == null || k.CompareTo(from) >= 0) && (to == null || k.CompareTo(to) <= 0)).OrderBy(k => k).Select(store.Load).ToList();
+        var rows = reportMonths.Select(x => (Month: x, Total: Total(x))).ToList(); reportTotals = rows.Select(x => x.Total).ToList(); HistoryGrid.ItemsSource = rows.OrderByDescending(x => x.Month.Key).Select(x => new HistoryRow(x.Month, x.Total)).ToList();
+        var cost = reportTotals.Sum(x => x.Cost); var sales = reportTotals.Sum(x => x.Sales); var profit = reportTotals.Sum(x => x.Profit); var fixedCost = reportTotals.Sum(x => x.FixedCost); var net = reportTotals.Sum(x => x.Net); RangeSales.Text = Rules.ReportMoney(sales); RangeProfit.Text = Rules.ReportMoney(profit); RangeNet.Text = Rules.ReportMoney(net); RangeNet.Foreground = net < 0 ? Brushes.Firebrick : net > 0 ? Brushes.SeaGreen : Brushes.SlateGray; RangeOutcome.Text = Outcome(net) + " نهایی"; HistorySummary.Text = reportMonths.Count == 0 ? "در این بازه ماهی ثبت نشده است." : $"{reportMonths.Count} ماه · بهای تمام‌شده: {Rules.ReportMoney(cost)} ریال · هزینه ثابت: {Rules.ReportMoney(fixedCost)} ریال · حاشیه سود: {Rules.Percent(sales == 0 ? null : profit / sales)}"; DrawTrend();
     }
     void TrendFilterChanged(object s, RoutedEventArgs e) => DrawTrend(); void TrendSizeChanged(object s, SizeChangedEventArgs e) => DrawTrend();
     void DrawTrend()
     {
         if (TrendCanvas == null || TrendEmpty == null) return; TrendCanvas.Children.Clear(); if (reportMonths.Count < 2) { TrendEmpty.Visibility = Visibility.Visible; return; } TrendEmpty.Visibility = Visibility.Collapsed; var width = TrendCanvas.ActualWidth; var height = TrendCanvas.ActualHeight; if (width < 80 || height < 80) return;
         var selected = new List<(string Name, Brush Brush, Func<LedgerTotal, decimal> Get)>(); if (TrendSales.IsChecked == true) selected.Add(("فروش", Brushes.SteelBlue, x => x.Sales)); if (TrendProfit.IsChecked == true) selected.Add(("سود", Brushes.SeaGreen, x => x.Profit)); if (TrendNet.IsChecked == true) selected.Add(("نتیجه", Brushes.Firebrick, x => x.Net)); if (selected.Count == 0) return;
-        var totals = reportMonths.Select(Total).ToList(); var values = selected.SelectMany(s => totals.Select(s.Get)).ToList(); var min = Math.Min(0, values.Min()); var max = Math.Max(0, values.Max()); if (min == max) { min--; max++; } var pad = 30d; var chartW = width - pad * 2; var chartH = height - 48; double X(int i) => pad + chartW * i / (reportMonths.Count - 1); double Y(decimal v) => 16 + (double)((max - v) / (max - min)) * chartH;
+        var totals = reportTotals; var values = selected.SelectMany(s => totals.Select(s.Get)).ToList(); var min = Math.Min(0, values.Min()); var max = Math.Max(0, values.Max()); if (min == max) { min--; max++; } var pad = 30d; var chartW = width - pad * 2; var chartH = height - 48; double X(int i) => pad + chartW * i / (reportMonths.Count - 1); double Y(decimal v) => 16 + (double)((max - v) / (max - min)) * chartH;
         TrendCanvas.Children.Add(new System.Windows.Shapes.Line { X1 = pad, X2 = width - pad, Y1 = Y(0), Y2 = Y(0), Stroke = Brushes.LightGray, StrokeThickness = 1 });
         foreach (var series in selected) { var line = new System.Windows.Shapes.Polyline { Stroke = series.Brush, StrokeThickness = 2.5, StrokeLineJoin = PenLineJoin.Round }; for (var i = 0; i < totals.Count; i++) line.Points.Add(new Point(X(i), Y(series.Get(totals[i])))); TrendCanvas.Children.Add(line); for (var i = 0; i < totals.Count; i++) { var p = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Fill = series.Brush, ToolTip = $"{reportMonths[i].Key}\n{series.Name}: {Rules.ReportMoney(series.Get(totals[i]))} ریال" }; Canvas.SetLeft(p, X(i) - 4); Canvas.SetTop(p, Y(series.Get(totals[i])) - 4); TrendCanvas.Children.Add(p); } }
         for (var i = 0; i < reportMonths.Count; i++) { var label = new TextBlock { Text = reportMonths[i].Key, FontSize = 10, Foreground = Brushes.DimGray }; Canvas.SetLeft(label, X(i) - 24); Canvas.SetTop(label, height - 22); TrendCanvas.Children.Add(label); }
@@ -513,7 +515,7 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup(); var enabled = preferences.AutoBackupOnExit; AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال"; AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray; AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است"; LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm"); var manual = preferences.LastBackupUtc != null; ManualBackupBadgeText.Text = manual ? "ثبت شده" : "ثبت نشده"; ManualBackupBadgeText.Foreground = manual ? Brushes.SeaGreen : Brushes.SlateGray; ManualBackupBadge.Background = manual ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); LastManualBackup.Text = manual ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
-    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۱۸ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
+    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۱۹ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
 public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purchase, decimal sales, decimal cost, decimal profit, decimal shortage)
