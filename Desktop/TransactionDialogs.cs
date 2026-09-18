@@ -10,7 +10,7 @@ namespace Profit.Desktop;
 static class DialogUi
 {
     public static TextBox Input(string value = "") => new() { Text = value, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 3, 0, 8) };
-    public static TextBlock Label(string text) => new() { Text = text, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft };
+    public static TextBlock Label(string text) => new() { Text = text, FontWeight = FontWeights.SemiBold, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft };
     public static string Today()
     {
         var c = new PersianCalendar(); var d = DateTime.Today; return $"{c.GetYear(d):0000}{c.GetMonth(d):00}{c.GetDayOfMonth(d):00}";
@@ -22,8 +22,8 @@ static class DialogUi
         Background = new SolidColorBrush(Color.FromRgb(21, 26, 37)), Padding = new Thickness(24, 18, 24, 16),
         Child = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch, Children =
         {
-            new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft },
-            new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft, TextWrapping = TextWrapping.Wrap }
+            new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft },
+            new TextBlock { Text = note, Foreground = Brushes.LightSteelBlue, Margin = new Thickness(0, 6, 0, 0), TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft, TextWrapping = TextWrapping.Wrap }
         }}
     };
 }
@@ -93,7 +93,7 @@ public sealed class BrandEditorDialog : Window
         var inputs = new Dictionary<string, TextBox>();
         void Rate(string key, string label, decimal value) { panel.Children.Add(DialogUi.Label(label)); var t = DialogUi.Input(); DialogUi.Percent(t, value); inputs[key] = t; panel.Children.Add(t); }
         Rate("discount", "تخفیف خرید ٪", brand?.PurchaseDiscount ?? 0); Rate("offer", "آفر خرید ٪", brand?.Offer ?? 0); Rate("markup", "سود / مارک‌آپ ٪", brand?.Markup ?? .04m); Rate("cash", "سهم فروش نقدی ٪", brand?.CashShare ?? .30m); Rate("credit", "سهم فروش چکی ٪", brand?.CreditShare ?? .70m); Rate("cashdiscount", "تخفیف نقدی ٪", brand?.CashDiscount ?? .05m);
-        var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(error);
+        var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right, HorizontalAlignment = HorizontalAlignment.Stretch }; panel.Children.Add(error);
         var actions = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right };
         var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary") }; actions.Children.Add(save); footer.Child = actions;
         save.Click += (_, _) => { try { Value = new Brand { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text), PurchaseDiscount = DialogUi.Percent(inputs["discount"]), Offer = DialogUi.Percent(inputs["offer"]), Markup = DialogUi.Percent(inputs["markup"]), CashShare = DialogUi.Percent(inputs["cash"]), CreditShare = DialogUi.Percent(inputs["credit"]), CashDiscount = DialogUi.Percent(inputs["cashdiscount"]) }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };

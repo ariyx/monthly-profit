@@ -16,8 +16,8 @@
 <Image Source="pack://application:,,,/Assets/company-logo-cropped.png" Stretch="Uniform"/>
 </Border>
 <StackPanel Grid.Column="1" Margin="20,0" VerticalAlignment="Center" FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
-<TextBlock Text="شرکت متحد توزیع ایرانیان" FontSize="23" FontWeight="SemiBold" Foreground="White" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,0,0,5"/>
-<TextBlock Text="سامانه مدیریت سود ماهانه" Foreground="#CBD5E1" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock Text="شرکت متحد توزیع ایرانیان" FontSize="23" FontWeight="SemiBold" Foreground="White" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,0,0,5"/>
+<TextBlock Text="سامانه مدیریت سود ماهانه" Foreground="#CBD5E1" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 <Border Grid.Column="0" Background="White" CornerRadius="9" Padding="8,5" VerticalAlignment="Center">
 <WrapPanel FlowDirection="RightToLeft">
@@ -42,27 +42,27 @@
 <Grid Margin="22" HorizontalAlignment="Stretch"><StackPanel HorizontalAlignment="Stretch">
 <StackPanel Margin="6,0,6,14" HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="نمای کلی ماه" Style="{StaticResource PageTitle}"/>
-<TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock Text="مهم‌ترین شاخص‌های مالی ماه انتخاب‌شده" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 <UniformGrid Columns="3" FlowDirection="RightToLeft">
 <Border Style="{StaticResource MetricCard}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <TextBlock Text="فروش کل" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Sales" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock x:Name="Sales" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <TextBlock Text="فروش نقدی و چکی" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
 <Border Style="{StaticResource MetricCard}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <TextBlock Text="سود پیش از هزینه ثابت" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Profit" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock x:Name="Profit" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <TextBlock x:Name="MarginLabel" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
 <Border Style="{StaticResource MetricCard}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <TextBlock Text="نتیجه پس از هزینه ثابت" Style="{StaticResource MutedText}"/>
-<TextBlock x:Name="Net" FontSize="27" FontWeight="SemiBold" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock x:Name="Net" FontSize="27" FontWeight="SemiBold" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <TextBlock x:Name="NetLabel" Style="{StaticResource MutedText}"/>
 </StackPanel>
 </Border>
@@ -75,12 +75,12 @@
 <Border Grid.Column="0" Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <TextBlock Text="ترکیب عملکرد" Style="{StaticResource CardTitle}"/>
-<TextBlock x:Name="Breakdown" Foreground="#172033" LineHeight="29" TextWrapping="Wrap" Margin="0,14,0,0" HorizontalAlignment="Right" TextAlignment="Right"/>
+<TextBlock x:Name="Breakdown" Foreground="#172033" LineHeight="29" TextWrapping="Wrap" Margin="0,14,0,0" HorizontalAlignment="Stretch" TextAlignment="Right"/>
 </StackPanel>
 </Border>
 <Border Grid.Column="1" Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
-<TextBlock Text="هزینه ثابت ماه" Style="{StaticResource CardTitle}" HorizontalAlignment="Right"/>
+<TextBlock Text="هزینه ثابت ماه" Style="{StaticResource CardTitle}" HorizontalAlignment="Stretch"/>
 <TextBox x:Name="Fixed" Margin="0,11,0,5"/>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right">
 <Button Content="ثبت هزینه" Click="SaveFixed" Style="{StaticResource Primary}"/>
@@ -93,7 +93,7 @@
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="RightToLeft">
 <TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}"/>
-<TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right"/>
+<TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 </StackPanel>
 <DataGrid x:Name="BrandsGrid" MaxHeight="360" HorizontalAlignment="Stretch" Margin="0,8,0,0">
 <DataGrid.Columns>
@@ -173,7 +173,7 @@
 <StackPanel FlowDirection="RightToLeft">
 <StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="گزارش ماه‌ها" Style="{StaticResource PageTitle}"/>
-<TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+<TextBlock Text="مقایسه عملکرد، فیلتر بازه و روند مالی" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
 <DockPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,14,0,0">
 <WrapPanel DockPanel.Dock="Right" FlowDirection="RightToLeft" HorizontalAlignment="Right">
@@ -270,7 +270,7 @@
 <StackPanel>
 <StackPanel HorizontalAlignment="Stretch" FlowDirection="RightToLeft">
 <TextBlock Text="پشتیبان‌گیری و بازیابی" Style="{StaticResource PageTitle}"/>
-<TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,4,0,0"/>
+<TextBlock Text="مدیریت نسخه‌های امن اطلاعات این رایانه" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,4,0,0"/>
 </StackPanel>
 <UniformGrid Columns="2" Margin="0,16,0,0" FlowDirection="RightToLeft">
 <Border Background="#F8FAFC" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="16" Margin="0,0,6,0">
@@ -325,10 +325,10 @@
 <ColumnDefinition Width="Auto"/>
 <ColumnDefinition Width="160"/>
 </Grid.ColumnDefinitions>
-<StackPanel Grid.Column="0" Width="340" Margin="0,0,32,0" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft">
-<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft"/>
-<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
-<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
+<StackPanel Grid.Column="0" Width="340" Margin="0,0,32,0" HorizontalAlignment="Stretch" VerticalAlignment="Center" FlowDirection="RightToLeft">
+<TextBlock Text="وبـیـــلـو" FontSize="30" FontWeight="Bold" Foreground="#6D28D9" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft"/>
+<TextBlock Text="طراحی و توسعهٔ راهکارهای نرم‌افزاری کسب‌وکار" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Ink}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,7,0,0"/>
+<TextBlock Text="توسعه‌دهنده: Sadegh Malekzadeh" Style="{StaticResource MutedText}" TextAlignment="Right" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="0,9,0,0"/>
 </StackPanel>
 <Border Grid.Column="1" Width="136" Height="136" Background="#F6F1FF" CornerRadius="18" Padding="14" HorizontalAlignment="Right" VerticalAlignment="Center">
 <Image Source="pack://application:,,,/Assets/webilo-logo.png" Width="100" Height="100" Stretch="Uniform"/>
@@ -338,8 +338,8 @@
 </Border>
 <Border Style="{StaticResource Panel}" HorizontalAlignment="Stretch">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
-<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Right"/>
-<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Right" Margin="0,7,0,0"/>
+<TextBlock Text="سامانه مدیریت سود ماهانه" FontSize="20" FontWeight="Bold" Foreground="{StaticResource Ink}" FlowDirection="RightToLeft" TextAlignment="Right" HorizontalAlignment="Stretch"/>
+<TextBlock Text="راهکاری محلی برای ثبت خرید، فروش، هزینه‌های ثابت و مشاهدهٔ سود ماهانهٔ شرکت متحد توزیع ایرانیان." Style="{StaticResource MutedText}" FlowDirection="RightToLeft" TextWrapping="Wrap" TextAlignment="Right" HorizontalAlignment="Stretch" Margin="0,7,0,0"/>
 <UniformGrid Columns="3" Margin="0,18,0,0" FlowDirection="RightToLeft">
 <Border Background="#FAFBFD" BorderBrush="#E4E8EF" BorderThickness="1" CornerRadius="10" Padding="15" Margin="0,0,5,0">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">

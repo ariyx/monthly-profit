@@ -21,7 +21,7 @@
 <Setter Property="TextAlignment" Value="Right"/>
 <!-- متن باید عرض ظرف را بگیرد؛ وگرنه TextAlignment روی یک کادر هم‌اندازهٔ متن،
      آن را در سمت چپِ StackPanel نگه می‌دارد. -->
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
   <Style TargetType="Button">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
@@ -77,7 +77,7 @@
 </Style>
   <Style TargetType="CheckBox">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 <Setter Property="HorizontalContentAlignment" Value="Right"/>
 </Style>
   <Style x:Key="SearchBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
@@ -192,7 +192,7 @@
 <Setter Property="Foreground" Value="{StaticResource Ink}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
   <Style x:Key="PageTitle" TargetType="TextBlock" BasedOn="{StaticResource SectionTitle}">
 <Setter Property="FontSize" Value="20"/>
@@ -208,7 +208,7 @@
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
   <Style x:Key="TrendCheckBox" TargetType="CheckBox">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
@@ -242,7 +242,7 @@
 <Setter Property="Foreground" Value="{StaticResource Muted}"/>
 <Setter Property="FlowDirection" Value="RightToLeft"/>
 <Setter Property="TextAlignment" Value="Right"/>
-<Setter Property="HorizontalAlignment" Value="Right"/>
+<Setter Property="HorizontalAlignment" Value="Stretch"/>
 </Style>
 <Style TargetType="TabItem">
 <Setter Property="FlowDirection" Value="RightToLeft"/>
