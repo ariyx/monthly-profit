@@ -358,10 +358,10 @@ public sealed class SaleDialog : Window
         void Suggest()
         {
             var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)); var profile = CurrentBrand(); if (item == null || profile == null) { hint.Text = "برای این کد کالا، ابتدا خرید یا تعدیل موجودی ثبت کنید."; return; }
-            var latest = ledger.Purchases.Where(x => x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).FirstOrDefault();
-            var cost = latest == null ? ledger.OpeningLots.Where(x => x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.SourceDate).ThenByDescending(x => x.Id).Select(x => x.UnitCost).FirstOrDefault() : Rules.NetPurchase(latest) / latest.Quantity;
-            if (cost == 0) return;
-            unit.Text = Rules.Money(cost * (1 + profile.Markup)); hint.Text = $"برند: {item.Brand} · قیمت پیشنهادی بر پایه آخرین قیمت خرید و سود برند.";
+            var latest = ledger.Purchases.Where(x => !x.IsAdjustment && x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).FirstOrDefault();
+            var grossPurchaseUnitPrice = latest?.UnitPrice ?? ledger.OpeningLots.Where(x => x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.SourceDate).ThenByDescending(x => x.Id).Select(x => x.UnitCost).FirstOrDefault();
+            if (grossPurchaseUnitPrice == 0) return;
+            unit.Text = Rules.Money(Rules.SuggestedSaleUnitPrice(grossPurchaseUnitPrice, profile.Markup)); hint.Text = $"برند: {item.Brand} · قیمت پیشنهادی بر پایه قیمت خرید اولیه، پیش از تخفیف و آفر، به‌علاوه سود برند.";
         }
         code.LostFocus += (_, _) => Suggest();
         save.Click += (_, _) => { try { var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کد کالا ناشناخته است. ابتدا تعدیل موجودی آن را ثبت کنید."); var profile = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand)) ?? throw new InvalidDataException("برند کالا یافت نشد."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); Value = new Sale { Date = Rules.Digits(date.Text), Code = item.Code, Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text), CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
@@ -425,7 +425,7 @@ public sealed class SaleEditorDialog : Window
                 var value = ReadValue();
                 var sales = ledger.Sales.Select(x => x.Id == original.Id ? value : x).ToList();
                 var settled = LedgerCalculator.Calculate(ledger with { Sales = sales }).Sales[value.Id];
-                preview.Text = $"فروش پس از کسورات: {Rules.Money(Rules.NetSaleBase(value))} ریال\nتخفیف نقدی: {Rules.Money(Rules.CashDiscountAmount(value))} ریال\nدریافتی نقدی: {Rules.Money(settled.Cash)} ریال\nفروش چکی: {Rules.Money(settled.Credit)} ریال\nبهای FIFO: {Rules.Money(settled.Cost)} ریال\nسود ناخالص: {Rules.Money(settled.Profit)} ریال" + (settled.Shortage > 0 ? $"\nکسری تأییدنشده: {Rules.Money(settled.Shortage)} عدد" : "");
+                preview.Text = $"فروش پس از کسورات: {Rules.Money(Rules.NetSaleBase(value))} ریال\nتخفیف نقدی: {Rules.Money(Rules.CashDiscountAmount(value))} ریال\nدریافتی نقدی: {Rules.Money(settled.Cash)} ریال\nفروش چکی: {Rules.Money(settled.Credit)} ریال\nبهای FIFO: {Rules.Money(settled.Cost)} ریال\nسود خالص فروش: {Rules.Money(settled.Profit)} ریال" + (settled.Shortage > 0 ? $"\nکسری تأییدنشده: {Rules.Money(settled.Shortage)} عدد" : "");
                 error.Text = "";
             }
             catch (Exception ex) { preview.Text = "برای نمایش پیش‌نمایش، همهٔ مقادیر را به‌درستی وارد کنید."; error.Text = ex.Message; }

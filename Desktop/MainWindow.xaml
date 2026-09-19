@@ -54,7 +54,7 @@
 </Border>
 <Border Style="{StaticResource MetricCard}">
 <StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<TextBlock Text="سود پیش از هزینه ثابت" Style="{StaticResource MutedText}"/>
+<TextBlock Text="سود خالص فروش" Style="{StaticResource MutedText}"/>
 <TextBlock x:Name="Profit" FontSize="27" FontWeight="SemiBold" Foreground="#172033" Margin="0,13,0,5" FlowDirection="LeftToRight" TextAlignment="Right" HorizontalAlignment="Stretch"/>
 <TextBlock x:Name="MarginLabel" Style="{StaticResource MutedText}"/>
 </StackPanel>
@@ -93,7 +93,7 @@
 <StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
 <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Top" FlowDirection="LeftToRight">
 <TextBlock Text="سودآوری برندها" Style="{StaticResource CardTitle}"/>
-<TextBlock Text="رتبه‌بندی بر اساس سود ناخالص" Style="{StaticResource MutedText}" TextAlignment="Left" HorizontalAlignment="Stretch"/>
+<TextBlock Text="رتبه‌بندی بر اساس سود خالص فروش" Style="{StaticResource MutedText}" TextAlignment="Left" HorizontalAlignment="Stretch"/>
 </StackPanel>
 <DataGrid x:Name="BrandsGrid" MaxHeight="360" HorizontalAlignment="Stretch" Margin="0,8,0,0">
 <DataGrid.Columns>
@@ -101,7 +101,7 @@
 <DataGridTextColumn Header="برند" Binding="{Binding Brand}" Width="1.45*" ElementStyle="{StaticResource TableText}"/>
 <DataGridTextColumn Header="تعداد کالا" Binding="{Binding Count}" Width="0.85*" ElementStyle="{StaticResource TableCenter}"/>
 <DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="سود خالص فروش" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="حاشیه سود" Binding="{Binding MarginText}" Width="0.85*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.05*" ElementStyle="{StaticResource TableText}"/>
 </DataGrid.Columns>
@@ -211,7 +211,7 @@
 </Border>
 <Border Grid.Column="1" Style="{StaticResource Panel}">
 <StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-<TextBlock Text="سود ناخالص بازه" Style="{StaticResource MutedText}" Margin="0,0,0,8"/>
+<TextBlock Text="سود خالص فروش بازه" Style="{StaticResource MutedText}" Margin="0,0,0,8"/>
 <TextBlock x:Name="RangeProfit" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource Ink}" FlowDirection="LeftToRight" TextAlignment="Right"/>
 </StackPanel>
 </Border>
@@ -236,8 +236,8 @@
 <CheckBox x:Name="TrendNet" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" Style="{StaticResource TrendCheckBox}" ToolTip="نمایش نتیجه نهایی">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft"><Ellipse Width="9" Height="9" Fill="#B42318" Margin="0,0,5,0"/><TextBlock Text="نتیجه نهایی"/></StackPanel>
 </CheckBox>
-<CheckBox x:Name="TrendProfit" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" Style="{StaticResource TrendCheckBox}" ToolTip="نمایش سود ناخالص">
-<StackPanel Orientation="Horizontal" FlowDirection="RightToLeft"><Ellipse Width="9" Height="9" Fill="#2E8B57" Margin="0,0,5,0"/><TextBlock Text="سود ناخالص"/></StackPanel>
+<CheckBox x:Name="TrendProfit" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" Style="{StaticResource TrendCheckBox}" ToolTip="نمایش سود خالص فروش">
+<StackPanel Orientation="Horizontal" FlowDirection="RightToLeft"><Ellipse Width="9" Height="9" Fill="#2E8B57" Margin="0,0,5,0"/><TextBlock Text="سود خالص فروش"/></StackPanel>
 </CheckBox>
 <CheckBox x:Name="TrendSales" IsChecked="True" Checked="TrendFilterChanged" Unchecked="TrendFilterChanged" Style="{StaticResource TrendCheckBox}" ToolTip="نمایش فروش کل">
 <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft"><Ellipse Width="9" Height="9" Fill="#4688C2" Margin="0,0,5,0"/><TextBlock Text="فروش کل"/></StackPanel>
@@ -253,7 +253,7 @@
 <DataGridTextColumn Header="ماه" Binding="{Binding Key}" Width="0.9*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="بهای تمام‌شده" Binding="{Binding CostText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="سود ناخالص" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
+<DataGridTextColumn Header="سود خالص فروش" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="هزینه ثابت" Binding="{Binding FixedText}" Width="1.25*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="وضعیت" Binding="{Binding OutcomeText}" Width="0.95*" ElementStyle="{StaticResource TableText}"/>
 <DataGridTextColumn Header="نتیجه ماه" Binding="{Binding NetText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>

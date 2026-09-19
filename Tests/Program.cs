@@ -39,6 +39,13 @@ try
     Equal(BrandPrefixRules.Detect(migratedBrands, "1120005")?.Name, "آذر بیوتی", "global default brand prefix");
     Equal(BrandPrefixRules.Display(BrandPrefixRules.Parse("115، 145")), "115، 145", "brand prefix editor parsing");
     Throws(() => BrandPrefixRules.ValidateUnique([brand with { CodePrefixes = ["106"] }, new Brand { Name = "Other", CodePrefixes = ["106"] }]), "duplicate prefix across brands");
+    var excelBrand = new Brand { Name = "Excel", PurchaseDiscount = .25m, Offer = .05m, Markup = .04m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m };
+    var excelItem = new CatalogItem { Code = "9001", Name = "نمونه اکسل", Brand = excelBrand.Name };
+    var excelPurchase = new Purchase { Id = "ep1", Date = "14050101", Code = excelItem.Code, Quantity = 1, UnitPrice = 1_000_000m, Total = 1_000_000m, BrandDiscount = excelBrand.PurchaseDiscount, Offer = excelBrand.Offer };
+    var excelSaleUnitPrice = Rules.SuggestedSaleUnitPrice(excelPurchase.UnitPrice, excelBrand.Markup); Equal(excelSaleUnitPrice, 1_040_000m, "Excel sale suggestion uses gross purchase price");
+    var excelSale = new Sale { Id = "es1", Date = "14050102", Code = excelItem.Code, Quantity = 1, UnitPrice = excelSaleUnitPrice, Total = excelSaleUnitPrice, CashShare = excelBrand.CashShare, CreditShare = excelBrand.CreditShare, CashDiscount = excelBrand.CashDiscount };
+    var excelSettlement = LedgerCalculator.Calculate(new Ledger { Brands = [excelBrand], Items = [excelItem], Purchases = [excelPurchase], Sales = [excelSale] }).Sales[excelSale.Id];
+    Equal(excelSettlement.Cost, 700_000m, "Excel net purchase cost"); Equal(excelSettlement.Cash, 296_400m, "Excel cash receipt"); Equal(excelSettlement.Credit, 728_000m, "Excel credit sale"); Equal(excelSettlement.Profit, 324_400m, "Excel net sale profit"); Equal(excelSettlement.Profit / excelSettlement.Sales, 324_400m / 1_024_400m, "Excel profit percentage");
     var item = new CatalogItem { Code = "1060395", Name = "کالای آزمایشی", Brand = brand.Name };
     var ledger = new Ledger
     {

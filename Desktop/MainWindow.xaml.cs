@@ -35,7 +35,7 @@ public partial class MainWindow : Window
         MoneyInput.Attach(Fixed);
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
-        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۱۹ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
+        AboutVersion.Text = "نسخه برنامه ۰٫۴٫۲۰ · گردش تاریخ‌دار کالا · داده‌ها فقط محلی هستند.";
         Reload(); Closing += OnClosing;
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
@@ -216,7 +216,7 @@ public partial class MainWindow : Window
             (needle.Length == 0 || x.Customer.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
         SalesGrid.ItemsSource = visible;
         var invoice = visible.Sum(x => Rules.NetSaleBase(x.Value)); var discount = visible.Sum(x => Rules.CashDiscountAmount(x.Value)); var sales = visible.Sum(x => x.Settlement.Sales); var cost = visible.Sum(x => x.Settlement.Cost); var shortage = visible.Sum(x => x.Settlement.Shortage);
-        SaleSummary.Text = $"{visible.Count} از {saleRows.Count} ردیف · فروش پس از کسورات: {Rules.ReportMoney(invoice)} ریال · تخفیف نقدی: {Rules.ReportMoney(discount)} ریال · دریافتی نهایی: {Rules.ReportMoney(sales)} ریال · سود ناخالص: {Rules.ReportMoney(sales - cost)} ریال" + (shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(shortage)} عدد" : "");
+        SaleSummary.Text = $"{visible.Count} از {saleRows.Count} ردیف · فروش پس از کسورات: {Rules.ReportMoney(invoice)} ریال · تخفیف نقدی: {Rules.ReportMoney(discount)} ریال · دریافتی نهایی: {Rules.ReportMoney(sales)} ریال · سود خالص فروش: {Rules.ReportMoney(sales - cost)} ریال" + (shortage > 0 ? $" · کسری تأییدنشده: {Rules.Money(shortage)} عدد" : "");
     }
 
     void OpenReconciliations(object s, RoutedEventArgs e)
@@ -487,7 +487,7 @@ public partial class MainWindow : Window
     }
     void PrintReport(object s, RoutedEventArgs e)
     {
-        if (!ResolveFixedEdit()) return; Guard(() => { var print = new PrintDialog(); if (print.ShowDialog() != true) return; var t = Total(current); var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth }; doc.Blocks.Add(new Paragraph(new Run("شرکت متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold }); doc.Blocks.Add(new Paragraph(new Run($"گزارش ماه {current.Key} — فروش: {Rules.ReportMoney(t.Sales)} ریال — سود ناخالص: {Rules.ReportMoney(t.Profit)} ریال — نتیجه: {Rules.ReportMoney(t.Net)} ریال ({Outcome(t.Net)})"))); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key); });
+        if (!ResolveFixedEdit()) return; Guard(() => { var print = new PrintDialog(); if (print.ShowDialog() != true) return; var t = Total(current); var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth }; doc.Blocks.Add(new Paragraph(new Run("شرکت متحد توزیع ایرانیان")) { FontSize = 21, FontWeight = FontWeights.Bold }); doc.Blocks.Add(new Paragraph(new Run($"گزارش ماه {current.Key} — فروش: {Rules.ReportMoney(t.Sales)} ریال — سود خالص فروش: {Rules.ReportMoney(t.Profit)} ریال — نتیجه: {Rules.ReportMoney(t.Net)} ریال ({Outcome(t.Net)})"))); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key); });
     }
     void ExportExcel(object s, RoutedEventArgs e)
     {
@@ -515,7 +515,7 @@ public partial class MainWindow : Window
     {
         var auto = store.LastAutomaticBackup(); var enabled = preferences.AutoBackupOnExit; AutoBackupBadgeText.Text = enabled ? "فعال" : "غیرفعال"; AutoBackupBadgeText.Foreground = enabled ? Brushes.SeaGreen : Brushes.SlateGray; AutoBackupBadge.Background = enabled ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); AutoBackupState.Text = enabled ? "زمان اجرا: هنگام خروج از برنامه" : "زمان اجرا: در حال حاضر غیرفعال است"; LastAutoBackup.Text = auto == null ? "آخرین پشتیبان خودکار: هنوز نسخه‌ای ایجاد نشده است." : "آخرین پشتیبان خودکار: ‎" + File.GetLastWriteTime(auto).ToString("yyyy/MM/dd HH:mm"); var manual = preferences.LastBackupUtc != null; ManualBackupBadgeText.Text = manual ? "ثبت شده" : "ثبت نشده"; ManualBackupBadgeText.Foreground = manual ? Brushes.SeaGreen : Brushes.SlateGray; ManualBackupBadge.Background = manual ? new SolidColorBrush(Color.FromRgb(236, 253, 243)) : new SolidColorBrush(Color.FromRgb(238, 242, 246)); LastManualBackup.Text = manual ? "آخرین پشتیبان دستی: ‎" + preferences.LastBackupUtc!.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm") : "هنوز یک پشتیبان دستی ایجاد نشده است.";
     }
-    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۱۹ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
+    void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود ماهانه | نسخه ۰٫۴٫۲۰ | گردش تاریخ‌دار کالا"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
 public sealed class ItemMonthRow(CatalogItem item, decimal stock, decimal purchase, decimal sales, decimal cost, decimal profit, decimal shortage)

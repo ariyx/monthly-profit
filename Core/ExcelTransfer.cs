@@ -14,7 +14,7 @@ public sealed record ImportReview(List<Product> Products, List<ImportIssue> Issu
 public static class ExcelTransfer
 {
     static readonly XNamespace S = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
-    static readonly string[] Headers = ["برند", "کالا", "قیمت خرید واحد (ریال)", "تعداد/مقدار", "تخفیف خرید %", "آفر خرید %", "سود اضافه %", "فروش چکی %", "فروش نقدی %", "تخفیف نقدی %", "بهای تمام‌شده", "قیمت فروش واحد", "فروش نقدی", "فروش چکی", "فروش کل", "سود ناخالص", "حاشیه سود"];
+    static readonly string[] Headers = ["برند", "کالا", "قیمت خرید واحد (ریال)", "تعداد/مقدار", "تخفیف خرید %", "آفر خرید %", "سود اضافه %", "فروش چکی %", "فروش نقدی %", "تخفیف نقدی %", "بهای تمام‌شده", "قیمت فروش واحد", "فروش نقدی", "فروش چکی", "فروش کل", "سود خالص فروش", "حاشیه سود"];
     static string Col(int n) { var s = ""; for (; n > 0; n = (n - 1) / 26) s = (char)('A' + (n - 1) % 26) + s; return s; }
     static XDocument Xml(ZipArchive z, string name)
     {
@@ -71,7 +71,7 @@ public static class ExcelTransfer
         Rules.Validate(month); var total = Rules.Summarize(month);
         var rows = new List<object?[]> { Headers.Cast<object?>().ToArray() };
         foreach (var p in month.Products) { var r = Rules.Calculate(p); rows.Add([p.Brand, p.Name, p.Price, p.Quantity, p.Discount, p.Offer, p.Markup, p.CreditShare, p.CashShare, p.CashDiscount, r.Cost, r.UnitSale, r.Cash, r.Credit, r.Sales, r.Profit, r.Margin]); }
-        List<object?[]> summary = [["عنوان", "مقدار"], ["ماه شمسی", month.Key], ["واحد پول", "ریال"], ["بهای تمام‌شده", total.Cost], ["فروش کل", total.Sales], ["سود ناخالص", total.Profit], ["هزینه ثابت ماه", total.FixedCost], ["سود / زیان پس از هزینه ثابت", total.Net], ["حاشیه سود", total.Margin], ["نوع گزارش", "خروجی مقادیر محاسبه‌شده؛ درصدها به‌صورت اعشاری ذخیره شده‌اند"], ["نسخه قواعد", month.FormulaVersion]];
+        List<object?[]> summary = [["عنوان", "مقدار"], ["ماه شمسی", month.Key], ["واحد پول", "ریال"], ["بهای تمام‌شده", total.Cost], ["فروش کل", total.Sales], ["سود خالص فروش", total.Profit], ["هزینه ثابت ماه", total.FixedCost], ["سود / زیان پس از هزینه ثابت", total.Net], ["حاشیه سود", total.Margin], ["نوع گزارش", "خروجی مقادیر محاسبه‌شده؛ درصدها به‌صورت اعشاری ذخیره شده‌اند"], ["نسخه قواعد", month.FormulaVersion]];
         var temp = file + ".tmp-" + Guid.NewGuid().ToString("N");
         try
         {
@@ -101,12 +101,12 @@ public static class ExcelTransfer
     {
         if (months.Count == 0) throw new InvalidDataException("برای خروجی بازه، حداقل یک ماه لازم است.");
         foreach (var m in months) Rules.Validate(m);
-        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
+        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود خالص فروش", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
         foreach (var m in months.OrderBy(x => x.Key)) { var t = Rules.Summarize(m); rows.Add([m.Key, t.Cost, t.Sales, t.Profit, t.FixedCost, t.Net, t.Margin]); }
         var totals = months.Select(Rules.Summarize).ToList(); var sales = totals.Sum(x => x.Sales); var profit = totals.Sum(x => x.Profit);
         var summary = new List<object?[]>
         {
-            new object?[] { "عنوان", "مقدار" }, new object?[] { "از ماه", months.Min(x => x.Key) }, new object?[] { "تا ماه", months.Max(x => x.Key) }, new object?[] { "تعداد ماه", months.Count }, new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود ناخالص", profit }, new object?[] { "هزینه ثابت", totals.Sum(x => x.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : profit / sales }
+            new object?[] { "عنوان", "مقدار" }, new object?[] { "از ماه", months.Min(x => x.Key) }, new object?[] { "تا ماه", months.Max(x => x.Key) }, new object?[] { "تعداد ماه", months.Count }, new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود خالص فروش", profit }, new object?[] { "هزینه ثابت", totals.Sum(x => x.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : profit / sales }
         };
         WriteSimpleWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه");
     }
@@ -114,7 +114,7 @@ public static class ExcelTransfer
     {
         var calc = LedgerCalculator.Calculate(ledger); var total = LedgerCalculator.SummarizeMonth(ledger, month);
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var rows = new List<object?[]> { new object?[] { "نوع", "تاریخ", "کد کالا", "برند", "کالا", "حساب", "تعداد", "قیمت واحد", "مبلغ کل", "کسورات", "مبلغ پس از کسورات", "بهای تمام‌شده", "سود ناخالص" } };
+        var rows = new List<object?[]> { new object?[] { "نوع", "تاریخ", "کد کالا", "برند", "کالا", "حساب", "تعداد", "قیمت واحد", "مبلغ کل", "کسورات", "مبلغ پس از کسورات", "بهای تمام‌شده", "سود خالص فروش" } };
         foreach (var p in ledger.Purchases.Where(x => Rules.MonthOf(x.Date) == month.Key).OrderBy(x => x.Date).ThenBy(x => x.Id))
         {
             var item = items[p.Code]; rows.Add([p.IsAdjustment ? "تعدیل موجودی" : "خرید", p.Date, p.Code, item.Brand, item.Name, p.Supplier, p.Quantity, p.UnitPrice, p.Total, p.Deductions, Rules.NetPurchase(p), null, null]);
@@ -126,7 +126,7 @@ public static class ExcelTransfer
         var summary = new List<object?[]>
         {
             new object?[] { "عنوان", "مقدار" }, new object?[] { "ماه شمسی", month.Key }, new object?[] { "واحد پول", "ریال" },
-            new object?[] { "بهای تمام‌شده فروش‌رفته", total.Cost }, new object?[] { "فروش کل", total.Sales }, new object?[] { "سود ناخالص", total.Profit },
+            new object?[] { "بهای تمام‌شده فروش‌رفته", total.Cost }, new object?[] { "فروش کل", total.Sales }, new object?[] { "سود خالص فروش", total.Profit },
             new object?[] { "هزینه ثابت ماه", total.FixedCost }, new object?[] { "نتیجه پس از هزینه ثابت", total.Net }, new object?[] { "حاشیه سود", total.Margin }
         };
         WriteSimpleWorkbook(file, rows, summary, "تراکنش‌های ماه", "خلاصه ماه");
@@ -134,14 +134,14 @@ public static class ExcelTransfer
     public static void ExportLedgerRange(Ledger ledger, IReadOnlyList<Month> months, string file)
     {
         if (months.Count == 0) throw new InvalidDataException("برای خروجی بازه، حداقل یک ماه لازم است.");
-        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود ناخالص", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
+        var rows = new List<object?[]> { new object?[] { "ماه", "بهای تمام‌شده", "فروش", "سود خالص فروش", "هزینه ثابت", "نتیجه", "حاشیه سود" } };
         var totals = months.OrderBy(x => x.Key).Select(x => (Month: x, Total: LedgerCalculator.SummarizeMonth(ledger, x))).ToList();
         foreach (var x in totals) rows.Add([x.Month.Key, x.Total.Cost, x.Total.Sales, x.Total.Profit, x.Total.FixedCost, x.Total.Net, x.Total.Margin]);
         var sales = totals.Sum(x => x.Total.Sales); var profit = totals.Sum(x => x.Total.Profit);
         var summary = new List<object?[]>
         {
             new object?[] { "عنوان", "مقدار" }, new object?[] { "از ماه", totals.First().Month.Key }, new object?[] { "تا ماه", totals.Last().Month.Key }, new object?[] { "تعداد ماه", totals.Count },
-            new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Total.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود ناخالص", profit },
+            new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Total.Cost) }, new object?[] { "فروش کل", sales }, new object?[] { "سود خالص فروش", profit },
             new object?[] { "هزینه ثابت", totals.Sum(x => x.Total.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Total.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : profit / sales }
         };
         WriteSimpleWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه");

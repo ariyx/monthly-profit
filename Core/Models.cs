@@ -262,7 +262,7 @@ public static class Rules
         var purchase = p.Price * p.Quantity;
         var discount = purchase * p.Discount;
         var offer = purchase * p.Offer;
-        var unitSale = p.Price * (1 + p.Markup);
+        var unitSale = SuggestedSaleUnitPrice(p.Price, p.Markup);
         return new(purchase, discount, purchase - discount, offer, purchase - discount - offer,
             purchase * p.Markup, unitSale, unitSale * p.Quantity * p.CashShare * (1 - p.CashDiscount), unitSale * p.Quantity * p.CreditShare);
     }
@@ -291,6 +291,7 @@ public static class Rules
         return date[..4] + "/" + date[4..6];
     }
     public static decimal NetPurchase(Purchase p) => p.Total - p.Deductions - (p.Total * p.BrandDiscount) - (p.Total * p.Offer);
+    public static decimal SuggestedSaleUnitPrice(decimal grossPurchaseUnitPrice, decimal markup) => grossPurchaseUnitPrice * (1 + markup);
     public static decimal NetSaleBase(Sale s) => s.Total - s.Deductions;
     public static decimal CashDiscountAmount(Sale s) => NetSaleBase(s) * s.CashShare * s.CashDiscount;
     public static (decimal Cash, decimal Credit) SplitSale(Sale s)
