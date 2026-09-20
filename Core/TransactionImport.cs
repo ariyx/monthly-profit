@@ -6,8 +6,8 @@ using System.Xml.Linq;
 
 namespace Profit.Core;
 
-public enum TransactionKind { Purchase, Sale }
 public sealed record ImportedTransaction(int Row, string ImportKey, string Date, string Code, string Name, string Account, decimal Quantity, decimal UnitPrice, decimal Total, decimal Deductions);
+public sealed record ImportIssue(int Row, string Message);
 public sealed record TransactionImportReview(List<ImportedTransaction> Rows, List<ImportIssue> Issues, int Ignored);
 
 public static class TransactionImport

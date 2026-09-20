@@ -3,103 +3,55 @@ namespace Profit.Core;
 public sealed class LedgerCalculation
 {
     public Dictionary<string, SaleSettlement> Sales { get; } = [];
-    public List<StockRow> Stock { get; } = [];
 }
 
+// محاسبه کاملاً فروش‌محور است: خرید، موجودی و FIFO در این مدل وجود ندارند.
 public static class LedgerCalculator
 {
-    sealed class Lot(Purchase purchase)
-    {
-        public string Code { get; } = purchase.Code;
-        public string Date { get; } = purchase.Date;
-        public string Id { get; } = purchase.Id;
-        public decimal Remaining { get; set; } = purchase.Quantity;
-        public decimal UnitCost { get; } = Rules.NetPurchase(purchase) / purchase.Quantity;
-        public string AdjustmentSaleId { get; } = purchase.AdjustmentSaleId;
-
-        public Lot(OpeningLot opening) : this(new Purchase { Id = opening.Id, Date = opening.SourceDate, Code = opening.Code, Quantity = opening.Quantity, Total = opening.Quantity * opening.UnitCost }) { }
-    }
-
-    sealed record Entry(string Date, int Order, string Id, Purchase? Purchase, Sale? Sale);
-
     public static LedgerCalculation Calculate(Ledger ledger)
-        => Calculate(ledger, null);
-
-    // موجودیِ یک ماه باید تا پایان همان ماه محاسبه شود، نه با خرید و فروش ماه‌های بعد.
-    public static LedgerCalculation CalculateAtEndOfMonth(Ledger ledger, string monthKey)
-    {
-        if (!Rules.ValidMonth(monthKey)) throw new InvalidDataException("ماه نامعتبر است.");
-        return Calculate(ledger, monthKey.Replace("/", "") + "31");
-    }
-
-    static LedgerCalculation Calculate(Ledger ledger, string? throughDate)
     {
         foreach (var brand in ledger.Brands) Rules.Validate(brand);
-        foreach (var settings in ledger.BrandMonths)
+        BrandPrefixRules.ValidateUnique(ledger.Brands);
+        if (ledger.Brands.Select(x => Rules.Normalize(x.Name)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != ledger.Brands.Count) throw new InvalidDataException("نام برند تکراری است.");
+        foreach (var setting in ledger.BrandMonths)
         {
-            if (!Rules.ValidMonth(settings.MonthKey)) throw new InvalidDataException("ماه تنظیمات برند نامعتبر است.");
-            foreach (var rate in settings.Rates) BrandMonthRules.Validate(rate);
-            if (settings.Rates.Select(x => Rules.Normalize(x.BrandName)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != settings.Rates.Count) throw new InvalidDataException("برند تکراری در تنظیمات ماهانه وجود دارد.");
+            if (!Rules.ValidMonth(setting.MonthKey)) throw new InvalidDataException("ماه تنظیمات برند نامعتبر است.");
+            foreach (var rate in setting.Rates) BrandMonthRules.Validate(rate);
+            if (setting.Rates.Select(x => Rules.Normalize(x.BrandName)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != setting.Rates.Count) throw new InvalidDataException("برند تکراری در تنظیمات ماهانه وجود دارد.");
         }
         if (ledger.BrandMonths.Select(x => x.MonthKey).Distinct(StringComparer.Ordinal).Count() != ledger.BrandMonths.Count) throw new InvalidDataException("تنظیمات یک ماه بیش از یک بار ثبت شده است.");
         foreach (var item in ledger.Items) Rules.Validate(item);
-        foreach (var purchase in ledger.Purchases) Rules.Validate(purchase);
+        var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        if (items.Count != ledger.Items.Count) throw new InvalidDataException("کد کالا تکراری است.");
+        var names = ledger.Brands.Select(x => Rules.Normalize(x.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (ledger.Items.Any(x => !names.Contains(Rules.Normalize(x.Brand)))) throw new InvalidDataException("برای یکی از کالاها برند معتبر تعریف نشده است.");
         foreach (var sale in ledger.Sales) Rules.Validate(sale);
-        foreach (var opening in ledger.OpeningLots) Rules.Validate(opening);
-        var brandNames = ledger.Brands.Select(x => Rules.Normalize(x.Name)).ToHashSet();
-        if (brandNames.Count != ledger.Brands.Count) throw new InvalidDataException("نام برند تکراری است.");
-        BrandPrefixRules.ValidateUnique(ledger.Brands);
-        if (ledger.Items.Any(x => !brandNames.Contains(Rules.Normalize(x.Brand)))) throw new InvalidDataException("برای یکی از کالاها تنظیمات برند ثبت نشده است.");
-        var itemByCode = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        if (itemByCode.Count != ledger.Items.Count) throw new InvalidDataException("کد کالا تکراری است.");
-        if (ledger.Purchases.Any(x => !itemByCode.ContainsKey(x.Code)) || ledger.Sales.Any(x => !itemByCode.ContainsKey(x.Code))) throw new InvalidDataException("برای یکی از تراکنش‌ها کالا تعریف نشده است.");
-        if (ledger.Purchases.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Purchases.Count || ledger.Sales.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Sales.Count) throw new InvalidDataException("شناسه تراکنش تکراری است.");
-        var salesById = ledger.Sales.ToDictionary(x => x.Id, StringComparer.Ordinal);
-        foreach (var adjustment in ledger.Purchases.Where(x => !string.IsNullOrWhiteSpace(x.AdjustmentSaleId)))
-        {
-            if (!salesById.TryGetValue(adjustment.AdjustmentSaleId, out var target)) throw new InvalidDataException("فروش مرتبط با یکی از تعدیل‌ها یافت نشد.");
-            if (!adjustment.Code.Equals(target.Code, StringComparison.OrdinalIgnoreCase) || adjustment.Date != target.Date) throw new InvalidDataException("کد یا تاریخ تعدیل با فروش مرتبط سازگار نیست.");
-        }
+        if (ledger.Sales.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Sales.Count) throw new InvalidDataException("شناسه فروش تکراری است.");
+        if (ledger.Sales.Any(x => !items.ContainsKey(x.Code))) throw new InvalidDataException("برای یکی از فروش‌ها کالا تعریف نشده است.");
 
         var result = new LedgerCalculation();
-        var lots = new List<Lot>();
-        var entries = ledger.Purchases.Where(x => throughDate == null || string.CompareOrdinal(x.Date, throughDate) <= 0).Select(x => new Entry(x.Date, 0, x.Id, x, null))
-            .Concat(ledger.Sales.Where(x => throughDate == null || string.CompareOrdinal(x.Date, throughDate) <= 0).Select(x => new Entry(x.Date, 1, x.Id, null, x)))
-            .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Order).ThenBy(x => x.Id, StringComparer.Ordinal);
-        lots.AddRange(ledger.OpeningLots.Select(x => new Lot(x)));
-        foreach (var entry in entries)
+        foreach (var sale in ledger.Sales)
         {
-            if (entry.Purchase is not null) { lots.Add(new Lot(entry.Purchase)); continue; }
-            var sale = entry.Sale!; var remaining = sale.Quantity; var cost = 0m;
-            // ابتدا موجودی واقعی/افتتاحیه طبق FIFO مصرف می‌شود؛ تعدیل متصل به همین
-            // فروش فقط کسری باقی‌ماندهٔ آن را پوشش می‌دهد و برای فروش دیگر مصرف نمی‌شود.
-            var available = lots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase) && x.Remaining > 0 && string.IsNullOrWhiteSpace(x.AdjustmentSaleId))
-                .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal)
-                .Concat(lots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase) && x.Remaining > 0 && x.AdjustmentSaleId == sale.Id)
-                    .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal));
-            foreach (var lot in available)
-            {
-                var used = Math.Min(remaining, lot.Remaining); lot.Remaining -= used; remaining -= used; cost += used * lot.UnitCost;
-                if (remaining == 0) break;
-            }
+            var grossPurchaseUnit = Rules.GrossPurchaseUnitFromSale(sale);
+            var netCostUnit = Rules.EstimatedNetCostUnit(sale);
             var split = Rules.SplitSale(sale);
-            result.Sales[sale.Id] = new SaleSettlement(cost, split.Cash, split.Credit, remaining);
-        }
-        foreach (var group in lots.Where(x => x.Remaining > 0).GroupBy(x => x.Code, StringComparer.OrdinalIgnoreCase))
-        {
-            if (!itemByCode.TryGetValue(group.Key, out var item)) continue;
-            result.Stock.Add(new StockRow(item.Code, item.Name, item.Brand, group.Sum(x => x.Remaining), group.Sum(x => x.Remaining * x.UnitCost)));
+            result.Sales[sale.Id] = new SaleSettlement(
+                Rules.EstimatedCost(sale), split.Cash, split.Credit, grossPurchaseUnit, netCostUnit, sale.EstimatedCostOverride.HasValue);
         }
         return result;
     }
 
-    public static LedgerTotal SummarizeMonth(Ledger ledger, Month month)
-        => SummarizeMonth(ledger, month, Calculate(ledger));
-
-    // Callers that already calculated the ledger can reuse the same immutable
-    // snapshot instead of repeating the full FIFO pass for every view/month.
-    public static LedgerTotal SummarizeMonth(Ledger ledger, Month month, LedgerCalculation calculation)
+    public static SaleSettlement PreviewSale(Sale sale)
     {
+        Rules.Validate(sale);
+        var split = Rules.SplitSale(sale);
+        return new SaleSettlement(Rules.EstimatedCost(sale), split.Cash, split.Credit, Rules.GrossPurchaseUnitFromSale(sale), Rules.EstimatedNetCostUnit(sale), sale.EstimatedCostOverride.HasValue);
+    }
+
+    public static LedgerTotal SummarizeMonth(Ledger ledger, Month month, LedgerCalculation? calculation = null)
+    {
+        Rules.Validate(month);
+        calculation ??= Calculate(ledger);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == month.Key).ToList();
         var settled = sales.Select(x => calculation.Sales[x.Id]).ToList();
         var codes = sales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
@@ -107,14 +59,7 @@ public static class LedgerCalculator
         return new LedgerTotal(settled.Sum(x => x.Cost), settled.Sum(x => x.Cash), settled.Sum(x => x.Credit), settled.Sum(x => x.Profit), month.FixedCost, sales.Sum(x => x.Quantity), codes.Count, items.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase).Count())
         {
             InvoiceSales = sales.Sum(Rules.NetSaleBase),
-            CashDiscountAmount = sales.Sum(Rules.CashDiscountAmount),
-            Shortage = settled.Sum(x => x.Shortage)
+            CashDiscountAmount = sales.Sum(Rules.CashDiscountAmount)
         };
-    }
-
-    public static SaleSettlement PreviewSale(Ledger ledger, Sale sale)
-    {
-        var preview = ledger with { Sales = [.. ledger.Sales, sale] };
-        return Calculate(preview).Sales[sale.Id];
     }
 }

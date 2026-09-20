@@ -5,7 +5,7 @@ namespace Profit.Core;
 
 public sealed class Store
 {
-    const int SchemaVersion = 3;
+    const int SchemaVersion = 4;
     public string Path { get; }
     string PreferencesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "preferences.json");
     private SqliteConnection Open(string? path = null, bool readOnly = false)
@@ -21,9 +21,9 @@ public sealed class Store
         if (version > SchemaVersion) throw new InvalidDataException("بانک اطلاعات متعلق به نسخه جدیدتر برنامه است.");
         if (version < SchemaVersion)
         {
-            // مدل درصدهای سراسری نسخه‌های قبل با تنظیمات ماهانه و تعدیل متصل به
-            // فروش سازگار نیست. طبق تصمیم کاربر، نسخهٔ ۳ با دفتر تمیز آغاز می‌شود.
-            cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=3;";
+            // نسخهٔ ۴ خرید، موجودی، FIFO و مغایرت را حذف می‌کند. طبق تصمیم کاربر
+            // دفتر جدید از دادهٔ تمیز شروع می‌شود تا دادهٔ قدیمی با فرمول جدید مخلوط نشود.
+            cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=4;";
             cmd.Parameters.AddWithValue("$ledger", JsonSerializer.Serialize(new Ledger(), Rules.Json)); cmd.ExecuteNonQuery();
         }
         else
@@ -43,7 +43,7 @@ public sealed class Store
     public void SaveLedger(Ledger ledger)
     {
         LedgerCalculator.Calculate(ledger);
-        var keys = ledger.Purchases.Select(x => Rules.MonthOf(x.Date)).Concat(ledger.Sales.Select(x => Rules.MonthOf(x.Date))).Distinct().ToList();
+        var keys = ledger.Sales.Select(x => Rules.MonthOf(x.Date)).Distinct().ToList();
         using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
         cmd.CommandText = "UPDATE app_state SET data=$data WHERE id=1"; cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(ledger, Rules.Json));
         if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("ذخیره دفتر تراکنش‌ها انجام نشد.");
