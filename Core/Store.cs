@@ -23,7 +23,7 @@ public sealed class Store
         {
             // مدل درصدهای سراسری نسخه‌های قبل با تنظیمات ماهانه و تعدیل متصل به
             // فروش سازگار نیست. طبق تصمیم کاربر، نسخهٔ ۳ با دفتر تمیز آغاز می‌شود.
-            cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=2;";
+            cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=3;";
             cmd.Parameters.AddWithValue("$ledger", JsonSerializer.Serialize(new Ledger(), Rules.Json)); cmd.ExecuteNonQuery();
         }
         else

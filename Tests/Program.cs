@@ -21,6 +21,7 @@ try
     var changed = p with { Id = "different", Name = "second", Price = 1000000m, Markup = .2m }; var mixed = new Month { Key = "1405/07", Products = [p, changed] }; var mt = Rules.Summarize(mixed);
     Equal(mt.Brands, 1, "multiple products per brand"); Equal(mt.Margin, mt.Profit / mt.Sales, "weighted margin");
     var db = new Store(Path.Combine(root, "data.sqlite")); db.Save(sample); var loaded = new Store(db.Path).Load(sample.Key); Equal(loaded.Products.Count, 6, "persistent restart");
+    Equal(new Store(db.Path).Load(sample.Key).Products.Count, 6, "schema migration is not repeated on later restarts");
     var copy = loaded.CopyTo("1405/07"); db.Save(copy); copy.Products[0] = copy.Products[0] with { Price = 77 }; db.Save(copy); Equal(db.Load("1405/06").Products[0].Price, 1000000m, "month isolation");
     var stale = db.Load(copy.Key); var fresh = db.Load(copy.Key); fresh.FixedCost = 9; db.Save(fresh); Throws(() => db.Save(stale), "optimistic revision");
     var closed = db.SetClosed(db.Load(copy.Key), true); Throws(() => db.Save(closed with { FixedCost = 10 }), "closed month protection"); db.SetClosed(closed, false);
