@@ -26,6 +26,7 @@ public partial class MainWindow : Window
     List<PendingBrandGridRow> pendingBrandRows = [];
     List<PurchaseGridRow> purchaseRows = [];
     List<SaleGridRow> saleRows = [];
+    bool firstRender = true;
     string DataDirectory => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MonthlyProfit", "Data");
 
     public MainWindow()
@@ -36,7 +37,17 @@ public partial class MainWindow : Window
         preferences = store.LoadPreferences();
         loading = true; AutoBackup.IsChecked = preferences.AutoBackupOnExit; loading = false;
         AboutVersion.Text = "نسخه برنامه ۰٫۵٫۰ · تنظیمات ماهانه برند و تعدیل فروش‌محور · داده‌ها فقط محلی هستند.";
-        Reload(); Closing += OnClosing;
+        // تأیید ماه می‌تواند یک پنجرهٔ modal باز کند. آن را پس از نمایش واقعی
+        // پنجرهٔ اصلی انجام می‌دهیم تا Owner دیالوگ معتبر باشد.
+        ContentRendered += OnFirstContentRendered;
+        Closing += OnClosing;
+    }
+    void OnFirstContentRendered(object? sender, EventArgs e)
+    {
+        if (!firstRender) return;
+        firstRender = false;
+        ContentRendered -= OnFirstContentRendered;
+        Guard(() => Reload());
     }
     void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
