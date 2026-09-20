@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -128,7 +129,7 @@ public sealed class SaleEditorDialog : Window
         var cleanDate = Rules.Digits(date.Text); var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(original.Code, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کالای فروش یافت نشد.");
         var month = Rules.MonthOf(cleanDate); var rate = BrandMonthRules.RequireConfirmed(ledger, item.Brand, month);
         var qty = Rules.Number(quantity.Text); var unit = Rules.Number(price.Text);
-        var overrideCost = manual.IsChecked == true ? Rules.Number(manualCost.Text) : null;
+        decimal? overrideCost = manual.IsChecked == true ? Rules.Number(manualCost.Text) : null;
         var next = BrandMonthRules.Apply(original with { Date = cleanDate, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = qty * unit, Deductions = Rules.Number(deductions.Text), EstimatedCostOverride = overrideCost, EstimatedCostOverrideNote = manual.IsChecked == true ? Rules.Normalize(manualReason.Text) : "" }, rate, month);
         Rules.Validate(next); return next;
     }
