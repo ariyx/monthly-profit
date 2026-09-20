@@ -1,7 +1,21 @@
 namespace Profit.Core;
 
-// مغایرت‌ها در سطح کد کالا جمع می‌شوند تا ورود یک فایل بزرگ به پنجره‌های متوالی تبدیل نشود.
-public sealed record ReconciliationCandidate(string Code, string Name, string Brand, string FirstDate, decimal Quantity, decimal SuggestedUnitCost, int SaleRows);
+// هر مغایرت به یک فروش مشخص متصل است. تجمیع بر اساس کد کالا باعث می‌شد
+// فروش‌هایی با قیمت‌های متفاوت یک بهای تعدیل مشترک بگیرند.
+public sealed record ReconciliationCandidate(
+    string SaleId,
+    string Code,
+    string Name,
+    string Brand,
+    string FirstDate,
+    decimal Quantity,
+    decimal SaleUnitPrice,
+    decimal SuggestedGrossPurchaseUnitPrice,
+    decimal SuggestedNetUnitCost,
+    decimal PurchaseDiscount,
+    decimal Offer,
+    decimal Markup,
+    string RateMonthKey);
 
 public static class ReconciliationPlanner
 {
@@ -13,42 +27,54 @@ public static class ReconciliationPlanner
         return FromCalculation(baseline, ordered, calculation);
     }
 
-    static List<ReconciliationCandidate> FromCalculation(Ledger baseline, IEnumerable<Sale> sales, LedgerCalculation calculation)
+    static List<ReconciliationCandidate> FromCalculation(Ledger ledger, IEnumerable<Sale> sales, LedgerCalculation calculation)
     {
-        var items = baseline.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var groups = new Dictionary<string, (CatalogItem Item, string FirstDate, decimal Quantity, int Rows)> (StringComparer.OrdinalIgnoreCase);
+        var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        var result = new List<ReconciliationCandidate>();
         foreach (var sale in sales.OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal))
         {
             var settlement = calculation.Sales[sale.Id];
-            if (settlement.Shortage > 0)
-            {
-                var item = items[sale.Code];
-                if (groups.TryGetValue(sale.Code, out var group)) groups[sale.Code] = (group.Item, group.FirstDate, group.Quantity + settlement.Shortage, group.Rows + 1);
-                else groups[sale.Code] = (item, sale.Date, settlement.Shortage, 1);
-            }
+            if (settlement.Shortage <= 0 || !items.TryGetValue(sale.Code, out var item)) continue;
+            var monthKey = Rules.MonthOf(sale.Date);
+            var rate = BrandMonthRules.TryConfirmed(ledger, item.Brand, monthKey);
+            var purchaseDiscount = string.IsNullOrWhiteSpace(sale.RateMonthKey) ? rate?.PurchaseDiscount ?? 0 : sale.PurchaseDiscount;
+            var offer = string.IsNullOrWhiteSpace(sale.RateMonthKey) ? rate?.Offer ?? 0 : sale.Offer;
+            var markup = string.IsNullOrWhiteSpace(sale.RateMonthKey) ? rate?.Markup ?? 0 : sale.Markup;
+            var hasRates = !string.IsNullOrWhiteSpace(sale.RateMonthKey) || rate != null;
+            var gross = !hasRates ? 0 : sale.UnitPrice / (1 + markup);
+            var net = !hasRates ? 0 : gross * (1 - purchaseDiscount - offer);
+            result.Add(new ReconciliationCandidate(sale.Id, item.Code, item.Name, item.Brand, sale.Date, settlement.Shortage,
+                sale.UnitPrice, gross, net, purchaseDiscount, offer, markup, sale.RateMonthKey.Length > 0 ? sale.RateMonthKey : monthKey));
         }
-        return groups.Values.Select(x => new ReconciliationCandidate(x.Item.Code, x.Item.Name, x.Item.Brand, x.FirstDate, x.Quantity, SuggestedUnitCost(baseline, x.Item.Code, x.FirstDate), x.Rows))
-            .OrderBy(x => x.FirstDate, StringComparer.Ordinal).ThenBy(x => x.Code, StringComparer.Ordinal).ToList();
+        return result.OrderBy(x => x.FirstDate, StringComparer.Ordinal).ThenBy(x => x.Code, StringComparer.Ordinal).ThenBy(x => x.SaleId, StringComparer.Ordinal).ToList();
     }
 
     public static List<ReconciliationCandidate> Existing(Ledger ledger)
         => Existing(ledger, LedgerCalculator.Calculate(ledger));
 
     public static List<ReconciliationCandidate> Existing(Ledger ledger, LedgerCalculation calculation)
-        => FromCalculation(ledger with { Sales = [] }, ledger.Sales, calculation);
+        => FromCalculation(ledger, ledger.Sales, calculation);
 
-    public static decimal SuggestedUnitCost(Ledger ledger, string code, string date)
+    public static Purchase CreateAdjustment(ReconciliationCandidate candidate, decimal quantity, decimal grossPurchaseUnitPrice, string note = "")
     {
-        var purchase = ledger.Purchases.Where(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase) && string.CompareOrdinal(x.Date, date) <= 0)
-            .OrderByDescending(x => x.Date, StringComparer.Ordinal).ThenByDescending(x => x.Id, StringComparer.Ordinal).FirstOrDefault();
-        if (purchase != null) return Rules.NetPurchase(purchase) / purchase.Quantity;
-        return ledger.OpeningLots.Where(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.SourceDate, StringComparer.Ordinal).ThenByDescending(x => x.Id, StringComparer.Ordinal).Select(x => x.UnitCost).FirstOrDefault();
-    }
-
-    public static List<Purchase> CreateAdjustments(IEnumerable<ReconciliationCandidate> candidates, IReadOnlyDictionary<string, decimal> unitCosts)
-        => candidates.Select(x =>
+        if (quantity <= 0 || quantity > candidate.Quantity) throw new InvalidDataException("تعداد تعدیل باید بیشتر از صفر و حداکثر برابر کسری همین فروش باشد.");
+        if (grossPurchaseUnitPrice <= 0) throw new InvalidDataException("قیمت خرید اولیهٔ تخمینی باید بیشتر از صفر باشد.");
+        var purchase = new Purchase
         {
-            if (!unitCosts.TryGetValue(x.Code, out var price) || price <= 0) throw new InvalidDataException($"برای مغایرت کد {x.Code} قیمت تعدیل تعیین نشده است.");
-            return new Purchase { Date = x.FirstDate, Code = x.Code, Supplier = "تعدیل دستی", Quantity = x.Quantity, UnitPrice = price, Total = x.Quantity * price, IsAdjustment = true, Note = "تعدیل موجودی ناشی از مغایرت" };
-        }).ToList();
+            Date = candidate.FirstDate,
+            Code = candidate.Code,
+            Supplier = "تعدیل مغایرت فروش",
+            Quantity = quantity,
+            UnitPrice = grossPurchaseUnitPrice,
+            Total = quantity * grossPurchaseUnitPrice,
+            BrandDiscount = candidate.PurchaseDiscount,
+            Offer = candidate.Offer,
+            IsAdjustment = true,
+            AdjustmentSaleId = candidate.SaleId,
+            RateMonthKey = candidate.RateMonthKey,
+            Note = string.IsNullOrWhiteSpace(note) ? "تعدیل خودکار بر اساس قیمت همان فروش و درصدهای ماه فروش" : Rules.Normalize(note)
+        };
+        Rules.Validate(purchase);
+        return purchase;
+    }
 }

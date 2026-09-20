@@ -39,6 +39,10 @@ try
     Equal(BrandPrefixRules.Detect(migratedBrands, "1120005")?.Name, "آذر بیوتی", "global default brand prefix");
     Equal(BrandPrefixRules.Display(BrandPrefixRules.Parse("115، 145")), "115، 145", "brand prefix editor parsing");
     Throws(() => BrandPrefixRules.ValidateUnique([brand with { CodePrefixes = ["106"] }, new Brand { Name = "Other", CodePrefixes = ["106"] }]), "duplicate prefix across brands");
+    var monthDraft = BrandMonthRules.DraftFor(new Ledger { Brands = [brand] }, "1405/04"); Equal(monthDraft.IsConfirmed, false, "new month rates require confirmation");
+    var monthLedger = BrandMonthRules.Confirm(new Ledger { Brands = [brand] }, "1405/04", monthDraft.Rates); Equal(BrandMonthRules.IsConfirmed(monthLedger, "1405/04"), true, "month rates confirmed");
+    var inheritedDraft = BrandMonthRules.DraftFor(monthLedger, "1405/05"); Equal(inheritedDraft.SourceMonthKey, "1405/04", "next month prefills from last confirmed month"); Equal(inheritedDraft.IsConfirmed, false, "inherited rates still require confirmation");
+    Throws(() => BrandMonthRules.RequireConfirmed(monthLedger, brand.Name, "1405/05"), "unconfirmed inherited rates cannot calculate new transactions");
     var excelBrand = new Brand { Name = "Excel", PurchaseDiscount = .25m, Offer = .05m, Markup = .04m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m };
     var excelItem = new CatalogItem { Code = "9001", Name = "نمونه اکسل", Brand = excelBrand.Name };
     var excelPurchase = new Purchase { Id = "ep1", Date = "14050101", Code = excelItem.Code, Quantity = 1, UnitPrice = 1_000_000m, Total = 1_000_000m, BrandDiscount = excelBrand.PurchaseDiscount, Offer = excelBrand.Offer };
@@ -49,7 +53,7 @@ try
     var item = new CatalogItem { Code = "1060395", Name = "کالای آزمایشی", Brand = brand.Name };
     var ledger = new Ledger
     {
-        Brands = [brand], Items = [item],
+        Brands = [brand], BrandMonths = monthLedger.BrandMonths, Items = [item],
         Purchases = [
             new Purchase { Id = "p1", Date = "14050301", Code = item.Code, Quantity = 5, UnitPrice = 100, Total = 500 },
             new Purchase { Id = "p2", Date = "14050401", Code = item.Code, Quantity = 5, UnitPrice = 200, Total = 1000 }
@@ -67,12 +71,28 @@ try
     var shortageLedger = ledger with { Sales = [.. ledger.Sales, shortageSale] }; var shortageCalculation = LedgerCalculator.Calculate(shortageLedger);
     var cachedReconciliation = ReconciliationPlanner.Existing(shortageLedger, shortageCalculation); Equal(cachedReconciliation.Single().Quantity, 2m, "cached reconciliation matches FIFO shortage");
     var reconciliation = ReconciliationPlanner.Find(ledger, [new Sale { Id = "s3", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }]);
-    Equal(reconciliation.Count, 1, "reconciliation groups shortages by code"); Equal(reconciliation[0].Quantity, 2m, "reconciliation quantity");
-    var adjustments = ReconciliationPlanner.CreateAdjustments(reconciliation, new Dictionary<string, decimal> { [item.Code] = 200m });
-    var partialAdjustment = ReconciliationPlanner.CreateAdjustments([reconciliation[0] with { Quantity = 1m }], new Dictionary<string, decimal> { [item.Code] = 200m });
-    Equal(partialAdjustment.Single().Quantity, 1m, "partial reconciliation adjustment is retained");
+    Equal(reconciliation.Count, 1, "reconciliation keeps each shortage sale separate"); Equal(reconciliation[0].Quantity, 2m, "reconciliation quantity");
+    Equal(reconciliation[0].SuggestedGrossPurchaseUnitPrice, 200m / 1.20m, "reverse calculation uses sale price and monthly markup");
+    var adjustments = new[] { ReconciliationPlanner.CreateAdjustment(reconciliation[0], reconciliation[0].Quantity, reconciliation[0].SuggestedGrossPurchaseUnitPrice) };
+    var partialAdjustment = ReconciliationPlanner.CreateAdjustment(reconciliation[0], 1m, reconciliation[0].SuggestedGrossPurchaseUnitPrice);
+    Equal(partialAdjustment.Quantity, 1m, "partial reconciliation adjustment is retained"); Equal(partialAdjustment.AdjustmentSaleId, "s3", "adjustment is linked to exact sale");
     var reconciledLedger = ledger with { Purchases = [.. ledger.Purchases, .. adjustments], Sales = [.. ledger.Sales, new Sale { Id = "s3", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 200, Total = 1200, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
     Equal(LedgerCalculator.Calculate(reconciledLedger).Sales["s3"].Shortage, 0m, "approved adjustment resolves shortage");
+    var differentPrices = ReconciliationPlanner.Find(ledger, [
+        new Sale { Id = "s4", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 240, Total = 1440, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m },
+        new Sale { Id = "s5", Date = "14050404", Code = item.Code, Quantity = 1, UnitPrice = 360, Total = 360, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }
+    ]);
+    Equal(differentPrices.Count, 2, "two shortage sales remain separate"); Equal(differentPrices[0].SuggestedGrossPurchaseUnitPrice, 200m, "first sale gets its own reverse price"); Equal(differentPrices[1].SuggestedGrossPurchaseUnitPrice, 300m, "second sale gets its own reverse price");
+    var firstOnlyAdjustment = ReconciliationPlanner.CreateAdjustment(differentPrices[0], differentPrices[0].Quantity, differentPrices[0].SuggestedGrossPurchaseUnitPrice);
+    var isolatedLedger = ledger with { Purchases = [.. ledger.Purchases, firstOnlyAdjustment], Sales = [.. ledger.Sales,
+        new Sale { Id = "s4", Date = "14050403", Code = item.Code, Quantity = 6, UnitPrice = 240, Total = 1440, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m },
+        new Sale { Id = "s5", Date = "14050404", Code = item.Code, Quantity = 1, UnitPrice = 360, Total = 360, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
+    Equal(LedgerCalculator.Calculate(isolatedLedger).Sales["s4"].Shortage, 0m, "linked adjustment resolves its own sale"); Equal(LedgerCalculator.Calculate(isolatedLedger).Sales["s5"].Shortage, 1m, "linked adjustment is not consumed by another sale");
+    var snapshottedSale = new Sale { Id = "s6", Date = "14050405", Code = item.Code, Quantity = 6, UnitPrice = 1_040_000m, Total = 6_240_000m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m, PurchaseDiscount = .25m, Offer = .05m, Markup = .04m, RateMonthKey = "1405/04" };
+    var changedRates = BrandMonthRules.Confirm(ledger, "1405/04", [BrandMonthRules.FromBrand(brand with { Markup = .50m, PurchaseDiscount = 0, Offer = 0 })]);
+    Equal(changedRates.Sales.Single(x => x.Id == "s1").Markup, .50m, "reconfirm updates only that month sale snapshot"); Equal(changedRates.Purchases.Single(x => x.Id == "p2").RateMonthKey, "1405/04", "reconfirm stamps that month purchase");
+    var snapshotCandidate = ReconciliationPlanner.Find(changedRates, [snapshottedSale]).Single();
+    Equal(snapshotCandidate.SuggestedGrossPurchaseUnitPrice, 1_000_000m, "reconciliation keeps sale-time markup snapshot"); Equal(snapshotCandidate.SuggestedNetUnitCost, 700_000m, "reconciliation keeps sale-time discount snapshot");
     var withOpening = new Ledger { Brands = [brand], Items = [item], OpeningLots = [new OpeningLot { Id = "o1", Code = item.Code, Quantity = 3, UnitCost = 80, SourceDate = "14041229" }], Sales = [new Sale { Id = "os1", Date = "14050102", Code = item.Code, Quantity = 2, UnitPrice = 200, Total = 400, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }] };
     Equal(LedgerCalculator.Calculate(withOpening).Sales["os1"].Cost, 160m, "opening inventory is consumed before 1405 purchases");
     db.SaveLedger(ledger); Equal(db.LoadLedger().Purchases.Count, 2, "ledger persists"); Equal(db.Keys().Contains("1405/03"), true, "purchase month auto-created"); Equal(db.Keys().Contains("1405/04"), true, "sale month auto-created");

@@ -50,7 +50,7 @@ public sealed class BrandManagerDialog : Window
         Title = "مدیریت برندها"; Width = 1020; Height = 600; MinWidth = 820; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir"); brands = source.OrderBy(x => x.Name).ToList();
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("مدیریت برندها", "پیشوند کد، برند کالاهای ورودی را تعیین می‌کند؛ درصدها برای ثبت‌های بعدی همان برند استفاده می‌شوند."));
+        root.Children.Add(DialogUi.Header("مدیریت برندها", "پیشوند کد، برند کالاهای ورودی را تعیین می‌کند؛ درصدهای مالی در جدول تأیید ماهانه نگهداری می‌شوند."));
         grid.AutoGenerateColumns = false; grid.Margin = new Thickness(22); grid.Columns.Add(new DataGridTextColumn { Header = "برند", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1.35, DataGridLengthUnitType.Star) });
         grid.Columns.Add(new DataGridTextColumn { Header = "پیشوند کد", Binding = new System.Windows.Data.Binding("Prefixes"), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
         grid.Columns.Add(new DataGridTextColumn { Header = "تخفیف خرید٪", Binding = new System.Windows.Data.Binding("PurchaseDiscount"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
@@ -180,6 +180,7 @@ public sealed class ReconciliationDialog : Window
         public string Date => Value.Date;
         public string Quantity => Rules.Money(Value.Quantity);
         public string UnitPrice => Rules.Money(Value.UnitPrice);
+        public string NetUnitCost => Rules.Money(Rules.NetPurchase(Value) / Value.Quantity);
         public string Note => Value.Note;
     }
 
@@ -206,12 +207,13 @@ public sealed class ReconciliationDialog : Window
         Title = "رسیدگی به مغایرت موجودی"; Width = 850; Height = 760; MinWidth = 700; MinHeight = 590; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("رسیدگی به مغایرت موجودی", "تعدیل در تاریخ اولین کسری ثبت می‌شود و در همان روز، پیش از فروش محاسبه خواهد شد."));
+        root.Children.Add(DialogUi.Header("رسیدگی به مغایرت موجودی", "این تعدیل فقط به همین فروش متصل است و از قیمت همان فروش و درصدهای تأییدشدهٔ ماه آن محاسبه می‌شود."));
 
         var content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         Grid.SetRow(content, 1); root.Children.Add(content);
         var panel = new StackPanel { Margin = new Thickness(24, 18, 24, 12), FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch }; content.Content = panel;
         panel.Children.Add(new TextBlock { Text = $"{candidate.Brand}  |  {candidate.Name}  |  کد کالا: {candidate.Code}", FontSize = 16, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Right });
+        panel.Children.Add(new TextBlock { Text = $"فروش مبنا: {candidate.FirstDate} · قیمت فروش واحد: {Rules.ReportMoney(candidate.SaleUnitPrice)} ریال · مارک‌آپ: {Rules.Percent(candidate.Markup)} · تخفیف خرید: {Rules.Percent(candidate.PurchaseDiscount)} · آفر: {Rules.Percent(candidate.Offer)}\nقیمت خرید اولیهٔ تخمینی: {Rules.ReportMoney(candidate.SuggestedGrossPurchaseUnitPrice)} ریال · بهای FIFO پیشنهادی: {Rules.ReportMoney(candidate.SuggestedNetUnitCost)} ریال", Foreground = new SolidColorBrush(Color.FromRgb(54, 74, 104)), TextAlignment = TextAlignment.Left, HorizontalAlignment = HorizontalAlignment.Stretch, FlowDirection = FlowDirection.RightToLeft, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 7, 0, 3) });
         panel.Children.Add(current);
         panel.Children.Add(new TextBlock { Text = "ثبت یا ویرایش تعدیل", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 18, 0, 7), TextAlignment = TextAlignment.Right });
         var inputs = new Grid { FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch }; for (var i = 0; i < 4; i++) inputs.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) }); panel.Children.Add(inputs);
@@ -219,35 +221,37 @@ public sealed class ReconciliationDialog : Window
         {
             var stack = new StackPanel { Margin = new Thickness(5, 0, 5, 0), FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch }; stack.Children.Add(DialogUi.Label(label)); box.ToolTip = hint; stack.Children.Add(box); Grid.SetColumn(stack, column); inputs.Children.Add(stack);
         }
-        Input(3, "تاریخ تعدیل", date, "مانند 14050612"); Input(2, "تعداد تعدیل", quantity, "حداکثر کسری باقی‌مانده"); Input(1, "قیمت واحد — ریال", unitPrice, "پیشنهاد از آخرین خرید"); Input(0, "یادداشت", note, "اختیاری");
+        Input(3, "تاریخ فروش / تعدیل", date, "تعدیل دقیقاً در تاریخ همین فروش ثبت می‌شود"); Input(2, "تعداد تعدیل", quantity, "حداکثر کسری همین فروش"); Input(1, "خرید اولیهٔ تخمینی — ریال", unitPrice, "قیمت فروش تقسیم بر یک به‌علاوه مارک‌آپ همان ماه"); Input(0, "یادداشت", note, "اختیاری");
+        date.IsReadOnly = true; unitPrice.IsReadOnly = true;
         var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 2, 0, 8) }; panel.Children.Add(actions);
         saveLine = new Button { Content = "ثبت تعدیل", Style = (Style)FindResource("Primary") };
         var newLine = new Button { Content = "تعدیل جدید" }; var delete = new Button { Content = "حذف تعدیل انتخاب‌شده" };
         actions.Children.Add(saveLine); actions.Children.Add(newLine); actions.Children.Add(delete);
-        panel.Children.Add(new TextBlock { Text = "تعدیلات قبلی همین کالا", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 7), TextAlignment = TextAlignment.Right });
+        panel.Children.Add(new TextBlock { Text = "تعدیلات قبلی همین فروش", FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 7), TextAlignment = TextAlignment.Right });
         panel.Children.Add(new TextBlock { Text = "یک ردیف را انتخاب کنید تا همان‌جا قابل ویرایش یا حذف باشد.", Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 0, 0, 6) });
         adjustments.Columns.Add(new DataGridTextColumn { Header = "تاریخ", Binding = new System.Windows.Data.Binding("Date"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
         adjustments.Columns.Add(new DataGridTextColumn { Header = "تعداد", Binding = new System.Windows.Data.Binding("Quantity"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        adjustments.Columns.Add(new DataGridTextColumn { Header = "قیمت واحد", Binding = new System.Windows.Data.Binding("UnitPrice"), Width = new DataGridLength(1.3, DataGridLengthUnitType.Star) });
+        adjustments.Columns.Add(new DataGridTextColumn { Header = "خرید اولیه تخمینی", Binding = new System.Windows.Data.Binding("UnitPrice"), Width = new DataGridLength(1.3, DataGridLengthUnitType.Star) });
+        adjustments.Columns.Add(new DataGridTextColumn { Header = "بهای FIFO", Binding = new System.Windows.Data.Binding("NetUnitCost"), Width = new DataGridLength(1.1, DataGridLengthUnitType.Star) });
         adjustments.Columns.Add(new DataGridTextColumn { Header = "یادداشت", Binding = new System.Windows.Data.Binding("Note"), Width = new DataGridLength(2.2, DataGridLengthUnitType.Star) });
         panel.Children.Add(adjustments); panel.Children.Add(error);
 
         var footer = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(24, 0, 24, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var close = new Button { Content = "انصراف" }; var apply = new Button { Content = "ثبت تغییرات و بستن", Style = (Style)FindResource("Primary") }; footer.Children.Add(close); footer.Children.Add(apply);
 
-        ReconciliationCandidate? CurrentCandidate() => ReconciliationPlanner.Existing(baseline with { Purchases = purchases }).FirstOrDefault(x => x.Code.Equals(initial.Code, StringComparison.OrdinalIgnoreCase));
+        ReconciliationCandidate? CurrentCandidate() => ReconciliationPlanner.Existing(baseline with { Purchases = purchases }).FirstOrDefault(x => x.SaleId == initial.SaleId);
         void ResetEditor()
         {
             selectedAdjustmentId = null; adjustments.SelectedItem = null; saveLine.Content = "ثبت تعدیل"; error.Text = "";
-            var candidateNow = remaining ?? initial; date.Text = candidateNow.FirstDate; quantity.Text = Rules.Money(candidateNow.Quantity); unitPrice.Text = candidateNow.SuggestedUnitCost > 0 ? Rules.Money(candidateNow.SuggestedUnitCost) : ""; note.Text = "";
+            var candidateNow = remaining ?? initial; date.Text = initial.FirstDate; quantity.Text = Rules.Money(candidateNow.Quantity); unitPrice.Text = candidateNow.SuggestedGrossPurchaseUnitPrice > 0 ? Rules.Money(candidateNow.SuggestedGrossPurchaseUnitPrice) : ""; note.Text = "";
         }
         void Refresh()
         {
             remaining = CurrentCandidate();
             current.Text = remaining == null
                 ? "کسری فعلی: ندارد. تعدیل‌های قبلی را در صورت نیاز انتخاب و ویرایش کنید."
-                : $"اولین کسری: {remaining.FirstDate} · کسری باقی‌مانده: {Rules.Money(remaining.Quantity)} · قیمت پیشنهادی: {(remaining.SuggestedUnitCost > 0 ? Rules.Money(remaining.SuggestedUnitCost) + " ریال" : "نیازمند ورود دستی")} · ردیف فروش درگیر: {remaining.SaleRows}";
-            adjustments.ItemsSource = purchases.Where(x => x.IsAdjustment && x.Code.Equals(initial.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Date, StringComparer.Ordinal).ThenByDescending(x => x.Id, StringComparer.Ordinal).Select(x => new AdjustmentRow { Value = x }).ToList();
+                : $"کسری باقی‌ماندهٔ همین فروش: {Rules.Money(remaining.Quantity)} · خرید اولیهٔ تخمینی: {(remaining.SuggestedGrossPurchaseUnitPrice > 0 ? Rules.Money(remaining.SuggestedGrossPurchaseUnitPrice) + " ریال" : "تنظیمات ماه تأیید نشده")} · بهای FIFO پیشنهادی: {Rules.Money(remaining.SuggestedNetUnitCost)} ریال";
+            adjustments.ItemsSource = purchases.Where(x => x.IsAdjustment && x.AdjustmentSaleId == initial.SaleId).OrderByDescending(x => x.Date, StringComparer.Ordinal).ThenByDescending(x => x.Id, StringComparer.Ordinal).Select(x => new AdjustmentRow { Value = x }).ToList();
         }
         adjustments.SelectionChanged += (_, _) =>
         {
@@ -260,16 +264,14 @@ public sealed class ReconciliationDialog : Window
             try
             {
                 var dateValue = Rules.Digits(date.Text); var amount = Rules.Number(quantity.Text); var price = Rules.Number(unitPrice.Text);
-                if (!Rules.ValidDate(dateValue)) throw new InvalidDataException("تاریخ تعدیل نامعتبر است.");
-                if (string.CompareOrdinal(dateValue, initial.FirstDate) > 0) throw new InvalidDataException("تاریخ تعدیل نمی‌تواند بعد از اولین فروشِ دچار کسری باشد.");
+                if (dateValue != initial.FirstDate) throw new InvalidDataException("تاریخ تعدیل باید دقیقاً تاریخ همین فروش باشد.");
                 if (!canEditMonth(Rules.MonthOf(dateValue))) throw new InvalidOperationException($"ماه {Rules.MonthOf(dateValue)} بسته است.");
                 if (amount <= 0 || price <= 0) throw new InvalidDataException("تعداد و قیمت واحد باید بیشتر از صفر باشند.");
                 if (selectedAdjustmentId == null)
                 {
                     if (remaining == null) throw new InvalidDataException("کسری باقی‌مانده‌ای برای ثبت تعدیل جدید وجود ندارد.");
                     if (amount > remaining.Quantity) throw new InvalidDataException("تعداد تعدیل نمی‌تواند از کسری باقی‌مانده بیشتر باشد.");
-                    var created = new Purchase { Date = dateValue, Code = initial.Code, Supplier = "تعدیل دستی", Quantity = amount, UnitPrice = price, Total = amount * price, IsAdjustment = true, Note = Rules.Normalize(note.Text) };
-                    Rules.Validate(created); purchases.Add(created);
+                    purchases.Add(ReconciliationPlanner.CreateAdjustment(remaining, amount, price, note.Text));
                 }
                 else
                 {
@@ -277,7 +279,7 @@ public sealed class ReconciliationDialog : Window
                     if (index < 0) throw new InvalidOperationException("تعدیل انتخاب‌شده یافت نشد.");
                     if (!canEditMonth(Rules.MonthOf(purchases[index].Date))) throw new InvalidOperationException($"ماه {Rules.MonthOf(purchases[index].Date)} بسته است.");
                     var withoutSelected = purchases.Where(x => x.Id != selectedAdjustmentId).ToList();
-                    var shortageWithoutSelected = ReconciliationPlanner.Existing(baseline with { Purchases = withoutSelected }).FirstOrDefault(x => x.Code.Equals(initial.Code, StringComparison.OrdinalIgnoreCase))?.Quantity ?? 0;
+                    var shortageWithoutSelected = ReconciliationPlanner.Existing(baseline with { Purchases = withoutSelected }).FirstOrDefault(x => x.SaleId == initial.SaleId)?.Quantity ?? 0;
                     if (amount > shortageWithoutSelected) throw new InvalidDataException("تعداد ویرایش‌شده نمی‌تواند از کسری واقعی این کالا بیشتر باشد.");
                     var updated = purchases[index] with { Date = dateValue, Quantity = amount, UnitPrice = price, Total = amount * price, Note = Rules.Normalize(note.Text) };
                     Rules.Validate(updated); purchases[index] = updated;
@@ -331,19 +333,19 @@ public sealed class PurchaseDialog : Window
             if (detected != null) brand.Text = detected.Name;
         }
         codeBox.LostFocus += (_, _) => Fill(); Fill();
-        save.Click += (_, _) => { try { var normalizedCode = Rules.Normalize(codeBox.Text); var selectedBrand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brand.Text)) ?? throw new InvalidDataException("ابتدا برند کالا را در بخش برندها ثبت کنید."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); var total = q * price; Item = new CatalogItem { Code = normalizedCode, Name = Rules.Normalize(name.Text), Brand = selectedBrand.Name }; Rules.Validate(Item); Value = new Purchase { Date = Rules.Digits(date.Text), Code = Item.Code, Supplier = Rules.Normalize(supplier.Text), Quantity = q, UnitPrice = price, Total = total, Deductions = Rules.Number(deductions.Text), BrandDiscount = adjustment ? 0 : selectedBrand.PurchaseDiscount, Offer = adjustment ? 0 : selectedBrand.Offer, IsAdjustment = adjustment, Note = adjustment ? "تعدیل موجودی ناشی از مغایرت" : "ثبت دستی" }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        save.Click += (_, _) => { try { var normalizedCode = Rules.Normalize(codeBox.Text); var selectedBrand = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(brand.Text)) ?? throw new InvalidDataException("ابتدا برند کالا را در بخش برندها ثبت کنید."); var dateText = Rules.Digits(date.Text); var monthKey = Rules.MonthOf(dateText); var rate = BrandMonthRules.RequireConfirmed(ledger, selectedBrand.Name, monthKey); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); var total = q * price; Item = new CatalogItem { Code = normalizedCode, Name = Rules.Normalize(name.Text), Brand = selectedBrand.Name }; Rules.Validate(Item); Value = new Purchase { Date = dateText, Code = Item.Code, Supplier = Rules.Normalize(supplier.Text), Quantity = q, UnitPrice = price, Total = total, Deductions = Rules.Number(deductions.Text), BrandDiscount = adjustment ? 0 : rate.PurchaseDiscount, Offer = adjustment ? 0 : rate.Offer, IsAdjustment = adjustment, RateMonthKey = monthKey, Note = adjustment ? "تعدیل موجودی ناشی از مغایرت" : "ثبت دستی" }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
     }
 }
 
 public sealed class SaleDialog : Window
 {
     public Sale? Value { get; private set; }
-    public SaleDialog(Ledger ledger)
+    public SaleDialog(Ledger ledger, string? dateValue = null)
     {
         Title = "ثبت فروش"; Width = 640; Height = 610; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var panel = new StackPanel { Margin = new Thickness(26), FlowDirection = FlowDirection.LeftToRight, HorizontalAlignment = HorizontalAlignment.Stretch }; Content = panel;
-        panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(DialogUi.Today()); panel.Children.Add(date);
+        panel.Children.Add(DialogUi.Label("تاریخ (14050421)")); var date = DialogUi.Input(dateValue ?? DialogUi.Today()); panel.Children.Add(date);
         panel.Children.Add(DialogUi.Label("کد کالا")); var code = DialogUi.Input(); panel.Children.Add(code);
         panel.Children.Add(DialogUi.Label("مشتری")); var customer = DialogUi.Input(); panel.Children.Add(customer);
         panel.Children.Add(DialogUi.Label("تعداد")); var qty = DialogUi.Input(); panel.Children.Add(qty);
@@ -351,20 +353,29 @@ public sealed class SaleDialog : Window
         panel.Children.Add(DialogUi.Label("کسورات — ریال")); var deductions = DialogUi.Input("0"); panel.Children.Add(deductions);
         var hint = new TextBlock { Foreground = new SolidColorBrush(Color.FromRgb(102, 112, 133)), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(hint);
         var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right }; panel.Children.Add(error); var save = new Button { Content = "ثبت فروش", Style = (Style)FindResource("Primary"), HorizontalAlignment = HorizontalAlignment.Right }; panel.Children.Add(save);
-        Brand? CurrentBrand()
+        (CatalogItem Item, BrandRate Rate)? CurrentBrand()
         {
-            var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)); return item == null ? null : ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand));
+            var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase));
+            if (item == null) return null;
+            var monthKey = Rules.MonthOf(Rules.Digits(date.Text));
+            return (item, BrandMonthRules.RequireConfirmed(ledger, item.Brand, monthKey));
         }
         void Suggest()
         {
-            var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)); var profile = CurrentBrand(); if (item == null || profile == null) { hint.Text = "برای این کد کالا، ابتدا خرید یا تعدیل موجودی ثبت کنید."; return; }
-            var latest = ledger.Purchases.Where(x => !x.IsAdjustment && x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).FirstOrDefault();
+            try
+            {
+            var currentBrand = CurrentBrand(); if (currentBrand == null) { hint.Text = "برای این کد کالا، ابتدا خرید یا تعدیل موجودی ثبت کنید."; return; }
+            var item = currentBrand.Value.Item; var profile = currentBrand.Value.Rate;
+            var saleDate = Rules.Digits(date.Text);
+            var latest = ledger.Purchases.Where(x => !x.IsAdjustment && x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase) && string.CompareOrdinal(x.Date, saleDate) <= 0).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).FirstOrDefault();
             var grossPurchaseUnitPrice = latest?.UnitPrice ?? ledger.OpeningLots.Where(x => x.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase)).OrderByDescending(x => x.SourceDate).ThenByDescending(x => x.Id).Select(x => x.UnitCost).FirstOrDefault();
             if (grossPurchaseUnitPrice == 0) return;
             unit.Text = Rules.Money(Rules.SuggestedSaleUnitPrice(grossPurchaseUnitPrice, profile.Markup)); hint.Text = $"برند: {item.Brand} · قیمت پیشنهادی بر پایه قیمت خرید اولیه، پیش از تخفیف و آفر، به‌علاوه سود برند.";
+            }
+            catch (Exception ex) { hint.Text = ex.Message; }
         }
-        code.LostFocus += (_, _) => Suggest();
-        save.Click += (_, _) => { try { var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کد کالا ناشناخته است. ابتدا تعدیل موجودی آن را ثبت کنید."); var profile = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name) == Rules.Normalize(item.Brand)) ?? throw new InvalidDataException("برند کالا یافت نشد."); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); Value = new Sale { Date = Rules.Digits(date.Text), Code = item.Code, Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text), CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        code.LostFocus += (_, _) => Suggest(); date.LostFocus += (_, _) => Suggest();
+        save.Click += (_, _) => { try { var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(Rules.Normalize(code.Text), StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کد کالا ناشناخته است. ابتدا خرید آن را ثبت کنید."); var dateText = Rules.Digits(date.Text); var monthKey = Rules.MonthOf(dateText); var profile = BrandMonthRules.RequireConfirmed(ledger, item.Brand, monthKey); var q = Rules.Number(qty.Text); var price = Rules.Number(unit.Text); Value = new Sale { Date = dateText, Code = item.Code, Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text), CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount, PurchaseDiscount = profile.PurchaseDiscount, Offer = profile.Offer, Markup = profile.Markup, RateMonthKey = monthKey }; Rules.Validate(Value); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
     }
 }
 
@@ -415,7 +426,8 @@ public sealed class SaleEditorDialog : Window
         Sale ReadValue()
         {
             var q = Rules.Number(quantity.Text); var price = Rules.Number(unitPrice.Text);
-            var value = original with { Date = Rules.Digits(date.Text), Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text) };
+            var dateText = Rules.Digits(date.Text); var monthKey = Rules.MonthOf(dateText); var profile = BrandMonthRules.RequireConfirmed(ledger, item.Brand, monthKey);
+            var value = original with { Date = dateText, Customer = Rules.Normalize(customer.Text), Quantity = q, UnitPrice = price, Total = q * price, Deductions = Rules.Number(deductions.Text), CashShare = profile.CashShare, CreditShare = profile.CreditShare, CashDiscount = profile.CashDiscount, PurchaseDiscount = profile.PurchaseDiscount, Offer = profile.Offer, Markup = profile.Markup, RateMonthKey = monthKey };
             Rules.Validate(value); return value;
         }
         void UpdatePreview()

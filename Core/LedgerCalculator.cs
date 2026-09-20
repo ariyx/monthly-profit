@@ -15,6 +15,7 @@ public static class LedgerCalculator
         public string Id { get; } = purchase.Id;
         public decimal Remaining { get; set; } = purchase.Quantity;
         public decimal UnitCost { get; } = Rules.NetPurchase(purchase) / purchase.Quantity;
+        public string AdjustmentSaleId { get; } = purchase.AdjustmentSaleId;
 
         public Lot(OpeningLot opening) : this(new Purchase { Id = opening.Id, Date = opening.SourceDate, Code = opening.Code, Quantity = opening.Quantity, Total = opening.Quantity * opening.UnitCost }) { }
     }
@@ -34,6 +35,13 @@ public static class LedgerCalculator
     static LedgerCalculation Calculate(Ledger ledger, string? throughDate)
     {
         foreach (var brand in ledger.Brands) Rules.Validate(brand);
+        foreach (var settings in ledger.BrandMonths)
+        {
+            if (!Rules.ValidMonth(settings.MonthKey)) throw new InvalidDataException("ماه تنظیمات برند نامعتبر است.");
+            foreach (var rate in settings.Rates) BrandMonthRules.Validate(rate);
+            if (settings.Rates.Select(x => Rules.Normalize(x.BrandName)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != settings.Rates.Count) throw new InvalidDataException("برند تکراری در تنظیمات ماهانه وجود دارد.");
+        }
+        if (ledger.BrandMonths.Select(x => x.MonthKey).Distinct(StringComparer.Ordinal).Count() != ledger.BrandMonths.Count) throw new InvalidDataException("تنظیمات یک ماه بیش از یک بار ثبت شده است.");
         foreach (var item in ledger.Items) Rules.Validate(item);
         foreach (var purchase in ledger.Purchases) Rules.Validate(purchase);
         foreach (var sale in ledger.Sales) Rules.Validate(sale);
@@ -45,6 +53,13 @@ public static class LedgerCalculator
         var itemByCode = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         if (itemByCode.Count != ledger.Items.Count) throw new InvalidDataException("کد کالا تکراری است.");
         if (ledger.Purchases.Any(x => !itemByCode.ContainsKey(x.Code)) || ledger.Sales.Any(x => !itemByCode.ContainsKey(x.Code))) throw new InvalidDataException("برای یکی از تراکنش‌ها کالا تعریف نشده است.");
+        if (ledger.Purchases.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Purchases.Count || ledger.Sales.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Sales.Count) throw new InvalidDataException("شناسه تراکنش تکراری است.");
+        var salesById = ledger.Sales.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        foreach (var adjustment in ledger.Purchases.Where(x => !string.IsNullOrWhiteSpace(x.AdjustmentSaleId)))
+        {
+            if (!salesById.TryGetValue(adjustment.AdjustmentSaleId, out var target)) throw new InvalidDataException("فروش مرتبط با یکی از تعدیل‌ها یافت نشد.");
+            if (!adjustment.Code.Equals(target.Code, StringComparison.OrdinalIgnoreCase) || adjustment.Date != target.Date) throw new InvalidDataException("کد یا تاریخ تعدیل با فروش مرتبط سازگار نیست.");
+        }
 
         var result = new LedgerCalculation();
         var lots = new List<Lot>();
@@ -56,7 +71,13 @@ public static class LedgerCalculator
         {
             if (entry.Purchase is not null) { lots.Add(new Lot(entry.Purchase)); continue; }
             var sale = entry.Sale!; var remaining = sale.Quantity; var cost = 0m;
-            foreach (var lot in lots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase) && x.Remaining > 0).OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal))
+            // ابتدا موجودی واقعی/افتتاحیه طبق FIFO مصرف می‌شود؛ تعدیل متصل به همین
+            // فروش فقط کسری باقی‌ماندهٔ آن را پوشش می‌دهد و برای فروش دیگر مصرف نمی‌شود.
+            var available = lots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase) && x.Remaining > 0 && string.IsNullOrWhiteSpace(x.AdjustmentSaleId))
+                .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal)
+                .Concat(lots.Where(x => x.Code.Equals(sale.Code, StringComparison.OrdinalIgnoreCase) && x.Remaining > 0 && x.AdjustmentSaleId == sale.Id)
+                    .OrderBy(x => x.Date, StringComparer.Ordinal).ThenBy(x => x.Id, StringComparer.Ordinal));
+            foreach (var lot in available)
             {
                 var used = Math.Min(remaining, lot.Remaining); lot.Remaining -= used; remaining -= used; cost += used * lot.UnitCost;
                 if (remaining == 0) break;

@@ -5,7 +5,7 @@ namespace Profit.Core;
 
 public sealed class Store
 {
-    const int SchemaVersion = 2;
+    const int SchemaVersion = 3;
     public string Path { get; }
     string PreferencesPath => System.IO.Path.Combine(System.IO.Path.GetDirectoryName(Path)!, "preferences.json");
     private SqliteConnection Open(string? path = null, bool readOnly = false)
@@ -21,7 +21,8 @@ public sealed class Store
         if (version > SchemaVersion) throw new InvalidDataException("بانک اطلاعات متعلق به نسخه جدیدتر برنامه است.");
         if (version < SchemaVersion)
         {
-            // داده‌های نسخهٔ اول آزمایشی بودند و مدل آن با گردش واقعی کالا سازگار نیست.
+            // مدل درصدهای سراسری نسخه‌های قبل با تنظیمات ماهانه و تعدیل متصل به
+            // فروش سازگار نیست. طبق تصمیم کاربر، نسخهٔ ۳ با دفتر تمیز آغاز می‌شود.
             cmd.CommandText = "DROP TABLE IF EXISTS months; DROP TABLE IF EXISTS app_state; CREATE TABLE months (key TEXT PRIMARY KEY, revision INTEGER NOT NULL, data TEXT NOT NULL); CREATE TABLE app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL); INSERT INTO app_state(id,data) VALUES(1,$ledger); PRAGMA user_version=2;";
             cmd.Parameters.AddWithValue("$ledger", JsonSerializer.Serialize(new Ledger(), Rules.Json)); cmd.ExecuteNonQuery();
         }

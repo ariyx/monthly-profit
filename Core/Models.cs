@@ -55,7 +55,7 @@ public sealed record Preferences
     public string? LastBackupPath { get; init; }
 }
 
-// نسخهٔ جدید برنامه، کالا را با کد آن می‌شناسد و درصدها را در سطح برند نگه می‌دارد.
+// کالا با کد شناخته می‌شود؛ این رکورد هویت برند و مقادیر اولیهٔ اولین ماه را نگه می‌دارد.
 public sealed record Brand
 {
     public string Name { get; init; } = "";
@@ -69,9 +69,139 @@ public sealed record Brand
     public decimal CashDiscount { get; init; } = .05m;
 }
 
+// درصدهای مالی برند از هویت و پیشوندهای آن جدا و برای هر ماه نسخه‌بندی می‌شوند.
+// مقادیر روی Brand فقط الگوی اولیهٔ اولین ماه هستند؛ محاسبات جدید صرفاً از
+// BrandMonthSettings تأییدشده استفاده می‌کنند.
+public sealed record BrandRate
+{
+    public string BrandName { get; init; } = "";
+    public decimal PurchaseDiscount { get; init; }
+    public decimal Offer { get; init; }
+    public decimal Markup { get; init; } = .04m;
+    public decimal CreditShare { get; init; } = .70m;
+    public decimal CashShare { get; init; } = .30m;
+    public decimal CashDiscount { get; init; } = .05m;
+}
+
+public sealed record BrandMonthSettings
+{
+    public string MonthKey { get; init; } = "";
+    public string SourceMonthKey { get; init; } = "";
+    public bool IsConfirmed { get; init; }
+    public DateTime? ConfirmedAtUtc { get; init; }
+    public List<BrandRate> Rates { get; init; } = [];
+}
+
+public static class BrandMonthRules
+{
+    public static BrandRate FromBrand(Brand brand) => new()
+    {
+        BrandName = brand.Name,
+        PurchaseDiscount = brand.PurchaseDiscount,
+        Offer = brand.Offer,
+        Markup = brand.Markup,
+        CreditShare = brand.CreditShare,
+        CashShare = brand.CashShare,
+        CashDiscount = brand.CashDiscount
+    };
+
+    public static void Validate(BrandRate rate)
+    {
+        if (string.IsNullOrWhiteSpace(rate.BrandName) || rate.BrandName.Trim().Length > 120) throw new InvalidDataException("نام برند در تنظیمات ماهانه نامعتبر است.");
+        if (new[] { rate.PurchaseDiscount, rate.Offer, rate.Markup, rate.CreditShare, rate.CashShare, rate.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای ماهانه برند باید بین صفر و ۱۰۰ باشند.");
+        if (rate.PurchaseDiscount + rate.Offer > 1) throw new InvalidDataException("جمع تخفیف خرید و آفر نباید از ۱۰۰٪ بیشتر باشد.");
+        if (rate.CashShare + rate.CreditShare != 1) throw new InvalidDataException("جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.");
+    }
+
+    public static BrandMonthSettings DraftFor(Ledger ledger, string monthKey)
+    {
+        if (!Rules.ValidMonth(monthKey)) throw new InvalidDataException("ماه تنظیمات برند نامعتبر است.");
+        var exact = ledger.BrandMonths.FirstOrDefault(x => x.MonthKey == monthKey);
+        if (exact != null)
+        {
+            var exactRates = exact.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase);
+            var merged = ledger.Brands.Select(brand => exactRates.TryGetValue(Rules.Normalize(brand.Name), out var saved)
+                ? saved with { BrandName = brand.Name }
+                : FromBrand(brand)).ToList();
+            var complete = merged.Count == exact.Rates.Count && merged.All(x => exactRates.ContainsKey(Rules.Normalize(x.BrandName)));
+            return exact with { IsConfirmed = exact.IsConfirmed && complete, Rates = merged };
+        }
+        var source = ledger.BrandMonths.Where(x => x.IsConfirmed && string.CompareOrdinal(x.MonthKey, monthKey) < 0)
+            .OrderByDescending(x => x.MonthKey, StringComparer.Ordinal).FirstOrDefault();
+        var sourceRates = source?.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase)
+            ?? new Dictionary<string, BrandRate>(StringComparer.OrdinalIgnoreCase);
+        var rates = ledger.Brands.Select(brand => sourceRates.TryGetValue(Rules.Normalize(brand.Name), out var inherited)
+            ? inherited with { BrandName = brand.Name }
+            : FromBrand(brand)).ToList();
+        return new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = source?.MonthKey ?? "تنظیمات اولیه", Rates = rates };
+    }
+
+    public static bool IsConfirmed(Ledger ledger, string monthKey)
+        => DraftFor(ledger, monthKey).IsConfirmed;
+
+    public static BrandRate RequireConfirmed(Ledger ledger, string brandName, string monthKey)
+    {
+        var settings = DraftFor(ledger, monthKey);
+        if (!settings.IsConfirmed) throw new InvalidOperationException($"تنظیمات برندهای ماه {monthKey} هنوز تأیید نشده است.");
+        return settings.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException($"در تنظیمات تأییدشده ماه {monthKey}، برند «{brandName}» وجود ندارد.");
+    }
+
+    public static BrandRate? TryConfirmed(Ledger ledger, string brandName, string monthKey)
+    {
+        var settings = DraftFor(ledger, monthKey);
+        return settings.IsConfirmed ? settings.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase)) : null;
+    }
+
+    public static Ledger Confirm(Ledger ledger, string monthKey, IEnumerable<BrandRate> values)
+    {
+        var rates = values.Select(x => x with { BrandName = Rules.Normalize(x.BrandName) }).ToList();
+        foreach (var rate in rates) Validate(rate);
+        var expected = ledger.Brands.Select(x => Rules.Normalize(x.Name)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+        var actual = rates.Select(x => Rules.Normalize(x.BrandName)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+        if (!expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase)) throw new InvalidDataException("جدول ماهانه باید دقیقاً یک ردیف برای هر برند فعال داشته باشد.");
+        if (actual.Distinct(StringComparer.OrdinalIgnoreCase).Count() != actual.Count) throw new InvalidDataException("یک برند در جدول ماهانه تکرار شده است.");
+        var draft = DraftFor(ledger, monthKey);
+        var confirmed = new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = draft.SourceMonthKey, IsConfirmed = true, ConfirmedAtUtc = DateTime.UtcNow, Rates = rates };
+        var staged = ledger with { BrandMonths = [.. ledger.BrandMonths.Where(x => x.MonthKey != monthKey), confirmed] };
+        var items = staged.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        BrandRate RateForCode(string code)
+        {
+            if (!items.TryGetValue(code, out var item)) throw new InvalidDataException($"کالای کد {code} برای اعمال تنظیمات ماهانه یافت نشد.");
+            return RequireConfirmed(staged, item.Brand, monthKey);
+        }
+        var sales = staged.Sales.Select(sale => Rules.MonthOf(sale.Date) != monthKey ? sale : Apply(sale, RateForCode(sale.Code), monthKey)).ToList();
+        var saleById = sales.ToDictionary(x => x.Id, StringComparer.Ordinal);
+        var purchases = staged.Purchases.Select(purchase =>
+        {
+            if (Rules.MonthOf(purchase.Date) != monthKey) return purchase;
+            if (!string.IsNullOrWhiteSpace(purchase.AdjustmentSaleId) && saleById.TryGetValue(purchase.AdjustmentSaleId, out var target))
+            {
+                var gross = target.UnitPrice / (1 + target.Markup);
+                return purchase with { UnitPrice = gross, Total = purchase.Quantity * gross, BrandDiscount = target.PurchaseDiscount, Offer = target.Offer, RateMonthKey = monthKey };
+            }
+            if (purchase.IsAdjustment) return purchase;
+            var rate = RateForCode(purchase.Code);
+            return purchase with { BrandDiscount = rate.PurchaseDiscount, Offer = rate.Offer, RateMonthKey = monthKey };
+        }).ToList();
+        return staged with { Sales = sales, Purchases = purchases };
+    }
+
+    static Sale Apply(Sale sale, BrandRate rate, string monthKey) => sale with
+    {
+        CashShare = rate.CashShare,
+        CreditShare = rate.CreditShare,
+        CashDiscount = rate.CashDiscount,
+        PurchaseDiscount = rate.PurchaseDiscount,
+        Offer = rate.Offer,
+        Markup = rate.Markup,
+        RateMonthKey = monthKey
+    };
+}
+
 public static class BrandPrefixRules
 {
-    // تنظیمات اولیهٔ سراسری؛ پس از اولین اجرا کاملاً در «مدیریت برندها» ذخیره و قابل ویرایش‌اند.
+    // نگاشت پیشوند سراسری است؛ درصدهای مالی از این بخش جدا و ماهانه‌اند.
     // تشخیص در زمان ورود، تنها از CodePrefixes ذخیره‌شده در خود برند استفاده می‌کند.
     static readonly IReadOnlyDictionary<string, string[]> DefaultPrefixes = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
     {
@@ -132,6 +262,9 @@ public sealed record Purchase
     public decimal BrandDiscount { get; init; }
     public decimal Offer { get; init; }
     public bool IsAdjustment { get; init; }
+    // تعدیل مغایرت به یک فروش مشخص متصل است تا قیمت فروش‌های دیگر روی آن اثر نگذارد.
+    public string AdjustmentSaleId { get; init; } = "";
+    public string RateMonthKey { get; init; } = "";
     public string Note { get; init; } = "";
     public string ImportKey { get; init; } = "";
 }
@@ -150,6 +283,11 @@ public sealed record Sale
     public decimal CreditShare { get; init; }
     public decimal CashShare { get; init; }
     public decimal CashDiscount { get; init; }
+    // Snapshot کامل قواعد برند برای محاسبهٔ بعدی مغایرت همین فروش.
+    public decimal PurchaseDiscount { get; init; }
+    public decimal Offer { get; init; }
+    public decimal Markup { get; init; }
+    public string RateMonthKey { get; init; } = "";
     public string ImportKey { get; init; } = "";
 }
 
@@ -167,6 +305,7 @@ public sealed record Ledger
 {
     public bool BrandRulesInitialized { get; init; }
     public List<Brand> Brands { get; init; } = [];
+    public List<BrandMonthSettings> BrandMonths { get; init; } = [];
     public List<CatalogItem> Items { get; init; } = [];
     public List<Purchase> Purchases { get; init; } = [];
     public List<Sale> Sales { get; init; } = [];
@@ -318,10 +457,13 @@ public static class Rules
     public static void Validate(Purchase p)
     {
         if (!ValidDate(p.Date) || string.IsNullOrWhiteSpace(p.Code) || p.Quantity <= 0 || p.Total <= 0 || p.Deductions < 0 || p.BrandDiscount < 0 || p.Offer < 0 || NetPurchase(p) < 0) throw new InvalidDataException("اطلاعات خرید نامعتبر است.");
+        if (!string.IsNullOrWhiteSpace(p.RateMonthKey) && (!ValidMonth(p.RateMonthKey) || p.RateMonthKey != MonthOf(p.Date))) throw new InvalidDataException("ماه Snapshot خرید با تاریخ آن سازگار نیست.");
+        if (!string.IsNullOrWhiteSpace(p.AdjustmentSaleId) && !p.IsAdjustment) throw new InvalidDataException("فقط تعدیل مغایرت می‌تواند به فروش متصل باشد.");
     }
     public static void Validate(Sale s)
     {
-        if (!ValidDate(s.Date) || string.IsNullOrWhiteSpace(s.Code) || s.Quantity <= 0 || s.Total <= 0 || s.Deductions < 0 || s.CashShare < 0 || s.CreditShare < 0 || s.CashDiscount < 0 || s.CashShare + s.CreditShare != 1 || s.CashDiscount > 1 || NetSaleBase(s) < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (!ValidDate(s.Date) || string.IsNullOrWhiteSpace(s.Code) || s.Quantity <= 0 || s.Total <= 0 || s.Deductions < 0 || s.CashShare < 0 || s.CreditShare < 0 || s.CashDiscount < 0 || s.PurchaseDiscount < 0 || s.Offer < 0 || s.Markup < 0 || s.CashShare + s.CreditShare != 1 || s.CashDiscount > 1 || s.PurchaseDiscount + s.Offer > 1 || s.Markup > 1 || NetSaleBase(s) < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (!string.IsNullOrWhiteSpace(s.RateMonthKey) && (!ValidMonth(s.RateMonthKey) || s.RateMonthKey != MonthOf(s.Date))) throw new InvalidDataException("ماه Snapshot فروش با تاریخ آن سازگار نیست.");
     }
     public static void Validate(OpeningLot lot)
     {
