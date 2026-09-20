@@ -21,11 +21,15 @@ static class Test
     }
 }
 
-var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "monthly-profit-tests-" + Guid.NewGuid().ToString("N"));
-Directory.CreateDirectory(root);
-try
+public static class Program
 {
-    var fikores = BrandPrefixRules.Defaults.Single(x => x.Name == "Fikores");
+public static void Main()
+{
+    var root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "monthly-profit-tests-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        var fikores = BrandPrefixRules.Defaults.Single(x => x.Name == "Fikores");
     var item = new CatalogItem { Code = "106001", Name = "کالای آزمایشی", Brand = fikores.Name };
     var ledger = new Ledger { Brands = [fikores], Items = [item] };
 
@@ -86,9 +90,11 @@ try
     ExcelTransfer.ExportLedgerMonth(ledger, new Month { Key = "1405/06" }, xlsx);
     using var zip = ZipFile.OpenRead(xlsx);
     Test.True(zip.Entries.Any(e => e.FullName == "xl/worksheets/sheet1.xml"), "excel export sheet");
-    Console.WriteLine("Business, database and spreadsheet tests passed.");
+        Console.WriteLine("Business, database and spreadsheet tests passed.");
+    }
+    finally
+    {
+        if (Directory.Exists(root)) Directory.Delete(root, true);
+    }
 }
-finally
-{
-    if (Directory.Exists(root)) Directory.Delete(root, true);
 }
