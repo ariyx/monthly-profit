@@ -7,4 +7,9 @@
     <!-- Overrides the legacy native SQLite 3.49.1 transitively selected by Microsoft.Data.Sqlite. -->
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
   </ItemGroup>
+  <!-- These legacy files may remain in a working tree during an in-place update.
+       They belong to the removed purchase/inventory model and must never compile. -->
+  <ItemGroup>
+    <Compile Remove="OpeningInventory.cs;ReconciliationPlanner.cs" />
+  </ItemGroup>
 </Project>

@@ -7,4 +7,8 @@
     <Resource Include="Assets\Fonts\Vazirmatn-Regular.ttf" />
     <Resource Include="Assets\Fonts\Vazirmatn-SemiBold.ttf" />
   </ItemGroup>
+  <!-- Kept only to make in-place updates safe when an obsolete dialog file remains. -->
+  <ItemGroup>
+    <Compile Remove="ProductDialog.cs" />
+  </ItemGroup>
 </Project>
