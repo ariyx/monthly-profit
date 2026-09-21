@@ -23,8 +23,6 @@ public static class LedgerCalculator
         foreach (var item in ledger.Items) Rules.Validate(item);
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         if (items.Count != ledger.Items.Count) throw new InvalidDataException("کد کالا تکراری است.");
-        var names = ledger.Brands.Select(x => Rules.Normalize(x.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (ledger.Items.Any(x => !names.Contains(Rules.Normalize(x.Brand)))) throw new InvalidDataException("برای یکی از کالاها برند معتبر تعریف نشده است.");
         foreach (var sale in ledger.Sales) Rules.Validate(sale);
         if (ledger.Sales.Select(x => x.Id).Distinct(StringComparer.Ordinal).Count() != ledger.Sales.Count) throw new InvalidDataException("شناسه فروش تکراری است.");
         if (ledger.Sales.Any(x => !items.ContainsKey(x.Code))) throw new InvalidDataException("برای یکی از فروش‌ها کالا تعریف نشده است.");
@@ -32,6 +30,8 @@ public static class LedgerCalculator
         var result = new LedgerCalculation();
         foreach (var sale in ledger.Sales)
         {
+            // تا وقتی برند و Snapshot ماهانه مشخص نشده‌اند، فروش ذخیره می‌شود اما در سود وارد نمی‌شود.
+            if (!Rules.HasRateSnapshot(sale)) continue;
             var grossPurchaseUnit = Rules.GrossPurchaseUnitFromSale(sale);
             var netCostUnit = Rules.EstimatedNetCostUnit(sale);
             var split = Rules.SplitSale(sale);
@@ -53,13 +53,16 @@ public static class LedgerCalculator
         Rules.Validate(month);
         calculation ??= Calculate(ledger);
         var sales = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == month.Key).ToList();
-        var settled = sales.Select(x => calculation.Sales[x.Id]).ToList();
-        var codes = sales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var calculatedSales = sales.Where(x => calculation.Sales.ContainsKey(x.Id)).ToList();
+        var settled = calculatedSales.Select(x => calculation.Sales[x.Id]).ToList();
+        var codes = calculatedSales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var items = ledger.Items.Where(x => codes.Contains(x.Code, StringComparer.OrdinalIgnoreCase)).ToList();
-        return new LedgerTotal(settled.Sum(x => x.Cost), settled.Sum(x => x.Cash), settled.Sum(x => x.Credit), settled.Sum(x => x.Profit), month.FixedCost, sales.Sum(x => x.Quantity), codes.Count, items.Select(x => x.Brand).Distinct(StringComparer.OrdinalIgnoreCase).Count())
+        return new LedgerTotal(settled.Sum(x => x.Cost), settled.Sum(x => x.Cash), settled.Sum(x => x.Credit), settled.Sum(x => x.Profit), month.FixedCost, calculatedSales.Sum(x => x.Quantity), codes.Count, items.Select(x => x.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count())
         {
-            InvoiceSales = sales.Sum(Rules.NetSaleBase),
-            CashDiscountAmount = sales.Sum(Rules.CashDiscountAmount)
+            InvoiceSales = calculatedSales.Sum(Rules.NetSaleBase),
+            CashDiscountAmount = calculatedSales.Sum(Rules.CashDiscountAmount),
+            PendingSalesCount = sales.Count - calculatedSales.Count,
+            PendingInvoiceSales = sales.Where(x => !calculation.Sales.ContainsKey(x.Id)).Sum(Rules.NetSaleBase)
         };
     }
 }

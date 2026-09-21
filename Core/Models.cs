@@ -90,8 +90,15 @@ public static class BrandMonthRules
     {
         var month = DraftFor(ledger, monthKey);
         if (!month.IsConfirmed) throw new InvalidOperationException($"تنظیمات برندهای ماه {monthKey} هنوز تأیید نشده است.");
-        return month.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase))
+        return TryConfirmed(ledger, brandName, monthKey)
             ?? throw new InvalidOperationException($"برای برند «{brandName}» در ماه {monthKey} تنظیمی وجود ندارد.");
+    }
+
+    public static BrandRate? TryConfirmed(Ledger ledger, string brandName, string monthKey)
+    {
+        var month = DraftFor(ledger, monthKey);
+        if (!month.IsConfirmed) return null;
+        return month.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase));
     }
 
     public static Ledger Confirm(Ledger ledger, string monthKey, IEnumerable<BrandRate> values)
@@ -109,10 +116,30 @@ public static class BrandMonthRules
         {
             if (Rules.MonthOf(sale.Date) != monthKey) return sale;
             if (!items.TryGetValue(sale.Code, out var item)) throw new InvalidDataException($"کالای کد {sale.Code} یافت نشد.");
+            // فروشِ کالای بی‌برند در دفتر باقی می‌ماند، اما تا زمان تعیین برند محاسبه نمی‌شود.
+            if (string.IsNullOrWhiteSpace(item.Brand)) return sale;
             return Apply(sale, RequireConfirmed(staged, item.Brand, monthKey), monthKey);
         }).ToList();
         return staged with { Sales = sales };
     }
+
+    // پس از تعیین برندِ یک کد ناشناخته، فروش‌های معلقِ ماه‌های تأییدشده همان کد Snapshot می‌گیرند.
+    public static Ledger ApplyPendingSalesForItem(Ledger ledger, string code)
+    {
+        var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidDataException($"کالای کد {code} یافت نشد.");
+        if (string.IsNullOrWhiteSpace(item.Brand)) return ledger;
+        var sales = ledger.Sales.Select(sale =>
+        {
+            if (!sale.Code.Equals(code, StringComparison.OrdinalIgnoreCase) || HasSnapshot(sale)) return sale;
+            var monthKey = Rules.MonthOf(sale.Date);
+            var rate = TryConfirmed(ledger, item.Brand, monthKey);
+            return rate is null ? sale : Apply(sale, rate, monthKey);
+        }).ToList();
+        return ledger with { Sales = sales };
+    }
+
+    static bool HasSnapshot(Sale sale) => Rules.HasRateSnapshot(sale);
 
     public static Sale Apply(Sale sale, BrandRate rate, string monthKey) => sale with
     {
@@ -160,6 +187,7 @@ public static class BrandPrefixRules
     }
 }
 
+// Brand خالی یعنی کد ناشناخته است: ردیف فروش نگه‌داری می‌شود ولی هنوز قابل محاسبه نیست.
 public sealed record CatalogItem { public string Code { get; init; } = ""; public string Name { get; init; } = ""; public string Brand { get; init; } = ""; }
 public sealed record Sale
 {
@@ -203,6 +231,8 @@ public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, dec
     public decimal Sales => Cash + Credit;
     public decimal InvoiceSales { get; init; }
     public decimal CashDiscountAmount { get; init; }
+    public int PendingSalesCount { get; init; }
+    public decimal PendingInvoiceSales { get; init; }
     public decimal Net => Profit - FixedCost;
     public decimal? Margin => Sales == 0 ? null : Profit / Sales;
 }
@@ -224,6 +254,7 @@ public static class Rules
     public static decimal GrossPurchaseUnitFromSale(Sale sale) => sale.UnitPrice / (1 + sale.Markup);
     public static decimal EstimatedNetCostUnit(Sale sale) => GrossPurchaseUnitFromSale(sale) * (1 - sale.PurchaseDiscount - sale.Offer);
     public static decimal EstimatedCost(Sale sale) => sale.EstimatedCostOverride ?? EstimatedNetCostUnit(sale) * sale.Quantity;
+    public static bool HasRateSnapshot(Sale sale) => !string.IsNullOrWhiteSpace(sale.RateMonthKey);
     public static void Validate(Month month)
     {
         if (!ValidMonth(month.Key) || month.FormulaVersion != 2 || month.FixedCost < 0 || month.FixedCost > 1_000_000_000_000_000m || month.FixedExpenses.Count > 100) throw new InvalidDataException("اطلاعات ماه نامعتبر است.");
@@ -236,11 +267,17 @@ public static class Rules
     }
     public static void Validate(CatalogItem item)
     {
-        if (string.IsNullOrWhiteSpace(item.Code) || item.Code.Length > 60 || !item.Code.All(char.IsLetterOrDigit) || string.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 250 || string.IsNullOrWhiteSpace(item.Brand)) throw new InvalidDataException("مشخصات کالا نامعتبر است.");
+        if (string.IsNullOrWhiteSpace(item.Code) || item.Code.Length > 60 || !item.Code.All(char.IsLetterOrDigit) || string.IsNullOrWhiteSpace(item.Name) || item.Name.Length > 250) throw new InvalidDataException("مشخصات کالا نامعتبر است.");
     }
     public static void Validate(Sale sale)
     {
-        if (!ValidDate(sale.Date) || string.IsNullOrWhiteSpace(sale.Code) || sale.Quantity <= 0 || sale.UnitPrice <= 0 || sale.Total <= 0 || sale.Deductions < 0 || NetSaleBase(sale) < 0 || sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.Markup > 1 || sale.EstimatedCostOverride < 0 || string.IsNullOrWhiteSpace(sale.RateMonthKey)) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (!ValidDate(sale.Date) || string.IsNullOrWhiteSpace(sale.Code) || sale.Quantity <= 0 || sale.UnitPrice <= 0 || sale.Total <= 0 || sale.Deductions < 0 || NetSaleBase(sale) < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (!HasRateSnapshot(sale))
+        {
+            if (sale.EstimatedCostOverride.HasValue) throw new InvalidDataException("هزینهٔ دستی فقط برای فروشِ دارای برند و تنظیمات تأییدشده مجاز است.");
+            return;
+        }
+        if (sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.Markup > 1 || sale.EstimatedCostOverride < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
         if (sale.RateMonthKey != MonthOf(sale.Date)) throw new InvalidDataException("ماه Snapshot فروش با تاریخ آن سازگار نیست.");
         if (sale.EstimatedCostOverride.HasValue && string.IsNullOrWhiteSpace(sale.EstimatedCostOverrideNote)) throw new InvalidDataException("برای هزینهٔ دستی فروش، دلیل را وارد کنید.");
     }

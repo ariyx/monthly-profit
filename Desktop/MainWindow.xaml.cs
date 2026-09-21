@@ -108,9 +108,9 @@ public partial class MainWindow : Window
         Net.Foreground = color; NetLabel.Text = Outcome(total.Net); NetLabel.Foreground = color;
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.IndianRed : Brushes.SeaGreen;
         Fixed.Text = Rules.Money(current.FixedCost);
-        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nهزینه تخمینی فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}";
-        DrawSales(); DrawBrands(); DrawBrandSettings(); DrawHistory(); DrawBackupStatus();
-        Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده";
+        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nهزینه تخمینی فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}" + (total.PendingSalesCount == 0 ? "" : $"\n{total.PendingSalesCount} فروش به مبلغ {Rules.ReportMoney(total.PendingInvoiceSales)} ریال، منتظر تعیین برند یا تأیید تنظیمات است.");
+        DrawSales(); DrawBrands(); DrawBrandSettings(); DrawUnknown(); DrawHistory(); DrawBackupStatus();
+        Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده" + (total.PendingSalesCount == 0 ? "" : $" · {total.PendingSalesCount} فروش معلق");
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
 
@@ -154,6 +154,7 @@ public partial class MainWindow : Window
         DashboardPage.Visibility = page == "dashboard" ? Visibility.Visible : Visibility.Collapsed;
         SalesPage.Visibility = page == "sales" ? Visibility.Visible : Visibility.Collapsed;
         BrandsPage.Visibility = page == "brands" ? Visibility.Visible : Visibility.Collapsed;
+        UnknownPage.Visibility = page == "unknown" ? Visibility.Visible : Visibility.Collapsed;
         ReportsPage.Visibility = page == "reports" ? Visibility.Visible : Visibility.Collapsed;
         SupportPage.Visibility = page == "support" ? Visibility.Visible : Visibility.Collapsed;
         AboutPage.Visibility = page == "about" ? Visibility.Visible : Visibility.Collapsed;
@@ -169,15 +170,13 @@ public partial class MainWindow : Window
 
     void AddBrand(object s, RoutedEventArgs e)
     {
-        if (!CanEdit() || !EnsureBrandMonthConfirmed(current.Key)) return;
+        if (!CanEdit()) return;
         var dialog = new BrandEditorDialog(null) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null) return;
         Guard(() =>
         {
             if (ledger.Brands.Any(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(dialog.Value.Name), StringComparison.OrdinalIgnoreCase))) throw new InvalidDataException("این برند قبلاً ثبت شده است.");
-            var staged = ledger with { Brands = [.. ledger.Brands, dialog.Value] };
-            staged = BrandMonthRules.Confirm(staged, current.Key, BrandMonthRules.DraftFor(staged, current.Key).Rates);
-            SaveLedger(staged, $"برند «{dialog.Value.Name}» افزوده شد.");
+            SaveLedger(ledger with { Brands = [.. ledger.Brands, dialog.Value] }, $"برند «{dialog.Value.Name}» افزوده شد. درصدهای ماه را پیش از محاسبه تأیید کنید.");
         });
     }
     void BrandSettingsGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
@@ -205,7 +204,7 @@ public partial class MainWindow : Window
 
     void AddSale(object s, RoutedEventArgs e)
     {
-        if (!CanEdit() || !EnsureBrandMonthConfirmed(current.Key)) return;
+        if (!CanEdit()) return;
         var dialog = new SaleDialog(ledger, current.Key.Replace("/", "") + "01") { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null || dialog.Item == null) return;
         Guard(() =>
@@ -218,7 +217,7 @@ public partial class MainWindow : Window
     }
     void SalesGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
     {
-        if (SalesGrid.SelectedItem is not SaleGridRow row || !CanEdit(Rules.MonthOf(row.Value.Date)) || !EnsureBrandMonthConfirmed(Rules.MonthOf(row.Value.Date))) return;
+        if (SalesGrid.SelectedItem is not SaleGridRow row || !CanEdit(Rules.MonthOf(row.Value.Date))) return;
         var dialog = new SaleEditorDialog(ledger, row.Value) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null) return;
         Guard(() =>
@@ -231,7 +230,7 @@ public partial class MainWindow : Window
     void DrawSales()
     {
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        saleRows = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).Select(x => new SaleGridRow(x, items[x.Code], calculation.Sales[x.Id])).ToList();
+        saleRows = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderByDescending(x => x.Date).ThenByDescending(x => x.Id).Select(x => new SaleGridRow(x, items[x.Code], calculation.Sales.GetValueOrDefault(x.Id))).ToList();
         ApplySalesFilter();
     }
     void SalesSearchChanged(object s, TextChangedEventArgs e) => ApplySalesFilter();
@@ -241,7 +240,9 @@ public partial class MainWindow : Window
         if (SalesGrid == null) return;
         var needle = Rules.Normalize(SalesSearch.Text ?? "");
         var visible = saleRows.Where(x => needle.Length == 0 || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Customer.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase)).ToList();
-        SalesGrid.ItemsSource = visible; SalesSummary.Text = $"{visible.Count} از {saleRows.Count} فروش · فروش واقعی: {Rules.ReportMoney(visible.Sum(x => x.Settlement.Sales))} ریال · سود: {Rules.ReportMoney(visible.Sum(x => x.Settlement.Profit))} ریال";
+        var calculated = visible.Where(x => x.Settlement != null).ToList();
+        var pending = visible.Count - calculated.Count;
+        SalesGrid.ItemsSource = visible; SalesSummary.Text = $"{visible.Count} از {saleRows.Count} فروش · فروش واقعی: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Sales))} ریال · سود: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Profit))} ریال" + (pending == 0 ? "" : $" · {pending} فروش معلق");
     }
     void ImportSales(object s, RoutedEventArgs e)
     {
@@ -254,20 +255,19 @@ public partial class MainWindow : Window
             var known = review.Rows.Where(x => !ledger.ImportedRows.Contains(x.ImportKey)).ToList();
             var importMonths = known.Select(x => Rules.MonthOf(x.Date)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToList();
             if (importMonths.Any(x => !CanEdit(x))) return;
-            if (!EnsureBrandMonthsConfirmed(importMonths)) return;
-            var unknown = known.Where(x => ledger.Items.All(i => !i.Code.Equals(x.Code, StringComparison.OrdinalIgnoreCase)) && BrandPrefixRules.Detect(ledger.Brands, x.Code) == null).ToList();
-            if (unknown.Count > 0) throw new InvalidOperationException($"{unknown.Count} ردیف برند ناشناخته دارد. ابتدا برند یا پیشوند کد آن را در بخش برندها ثبت کنید؛ هیچ ردیفی وارد نشد.");
             var items = ledger.Items.ToList();
             var sales = new List<Sale>();
             foreach (var row in known)
             {
                 var item = items.FirstOrDefault(x => x.Code.Equals(row.Code, StringComparison.OrdinalIgnoreCase));
-                var brand = item?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, row.Code)!.Name;
+                var brand = item?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, row.Code)?.Name ?? "";
                 if (item == null) { item = new CatalogItem { Code = row.Code, Name = row.Name, Brand = brand }; items.Add(item); }
-                var month = Rules.MonthOf(row.Date); var rate = BrandMonthRules.RequireConfirmed(ledger, brand, month);
-                sales.Add(BrandMonthRules.Apply(new Sale { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey }, rate, month));
+                var rawSale = new Sale { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey };
+                var month = Rules.MonthOf(row.Date); var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, month);
+                sales.Add(rate is null ? rawSale : BrandMonthRules.Apply(rawSale, rate, month));
             }
-            SaveLedger(ledger with { Items = items, Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. known.Select(x => x.ImportKey)] }, $"{sales.Count} فروش از اکسل وارد شد.");
+            var pending = sales.Count(x => !Rules.HasRateSnapshot(x));
+            SaveLedger(ledger with { Items = items, Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. known.Select(x => x.ImportKey)] }, $"{sales.Count} فروش از اکسل وارد شد." + (pending == 0 ? "" : $" {pending} ردیف تا تعیین برند یا تأیید ماه، معلق است."));
         });
     }
 
@@ -281,9 +281,33 @@ public partial class MainWindow : Window
     void DrawBrands()
     {
         var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var groups = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).GroupBy(x => items[x.Code].Brand).Select(g => new BrandRow(g.Key, g.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).Count(), g.Sum(x => calculation.Sales[x.Id].Sales), g.Sum(x => calculation.Sales[x.Id].Profit))).OrderByDescending(x => x.Profit).ToList();
+        var groups = ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key && calculation.Sales.ContainsKey(x.Id)).GroupBy(x => items[x.Code].Brand).Select(g => new BrandRow(g.Key, g.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).Count(), g.Sum(x => calculation.Sales[x.Id].Sales), g.Sum(x => calculation.Sales[x.Id].Profit))).OrderByDescending(x => x.Profit).ToList();
         foreach (var row in groups) row.Rank = 1 + groups.Count(x => x.Profit > row.Profit);
         BrandsGrid.ItemsSource = groups;
+    }
+
+    void DrawUnknown()
+    {
+        var rows = ledger.Items.Where(x => string.IsNullOrWhiteSpace(x.Brand)).Select(item =>
+        {
+            var pending = ledger.Sales.Where(s => s.Code.Equals(item.Code, StringComparison.OrdinalIgnoreCase) && !calculation.Sales.ContainsKey(s.Id)).ToList();
+            return new UnknownCodeRow(item, pending.Count, pending.Sum(Rules.NetSaleBase));
+        }).Where(x => x.PendingCount > 0).OrderByDescending(x => x.PendingSales).ToList();
+        UnknownGrid.ItemsSource = rows;
+        UnknownSummary.Text = rows.Count == 0 ? "کد ناشناخته‌ای در فروش‌ها وجود ندارد." : $"{rows.Count} کد کالا در {rows.Sum(x => x.PendingCount)} فروش معلق است. برای تعیین برند، روی ردیف دوبار کلیک کنید.";
+    }
+
+    void UnknownGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
+    {
+        if (UnknownGrid.SelectedItem is not UnknownCodeRow row || !CanEdit()) return;
+        var dialog = new BrandAssignmentDialog(row.Item, ledger.Brands) { Owner = this };
+        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.BrandName)) return;
+        Guard(() =>
+        {
+            var items = ledger.Items.Select(x => x.Code.Equals(row.Item.Code, StringComparison.OrdinalIgnoreCase) ? x with { Brand = dialog.BrandName } : x).ToList();
+            var next = BrandMonthRules.ApplyPendingSalesForItem(ledger with { Items = items }, row.Item.Code);
+            SaveLedger(next, $"برند «{dialog.BrandName}» برای کد {row.Item.Code} ثبت شد.");
+        });
     }
 
     void HistoryFilterChanged(object s, SelectionChangedEventArgs e) { if (!loading) DrawHistory(); }
@@ -353,11 +377,16 @@ public partial class MainWindow : Window
     void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود فروش | نسخه ۰٫۶٫۰"); Status.Text = "اطلاعات نسخه کپی شد."; }
 }
 
-public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement settlement)
+public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement? settlement)
 {
-    public Sale Value => sale; public SaleSettlement Settlement => settlement;
-    public string Date => sale.Date; public string Customer => sale.Customer; public string Code => sale.Code; public string Brand => item.Brand; public string Name => item.Name;
-    public string QuantityText => Rules.Money(sale.Quantity); public string SalesText => Rules.ReportMoney(settlement.Sales); public string CostText => Rules.ReportMoney(settlement.Cost); public string ProfitText => Rules.ReportMoney(settlement.Profit); public string CostMethod => settlement.HasManualCost ? "دستی" : "خودکار";
+    public Sale Value => sale; public SaleSettlement? Settlement => settlement;
+    public string Date => sale.Date; public string Customer => sale.Customer; public string Code => sale.Code; public string Brand => string.IsNullOrWhiteSpace(item.Brand) ? "تعیین‌نشده" : item.Brand; public string Name => item.Name;
+    public string QuantityText => Rules.Money(sale.Quantity); public string SalesText => settlement == null ? "—" : Rules.ReportMoney(settlement.Sales); public string CostText => settlement == null ? "—" : Rules.ReportMoney(settlement.Cost); public string ProfitText => settlement == null ? "—" : Rules.ReportMoney(settlement.Profit); public string CostMethod => settlement == null ? "در انتظار تأیید" : settlement.HasManualCost ? "دستی" : "خودکار";
+}
+public sealed class UnknownCodeRow(CatalogItem item, int pendingCount, decimal pendingSales)
+{
+    public CatalogItem Item => item; public string Code => item.Code; public string Name => item.Name; public int PendingCount => pendingCount; public decimal PendingSales => pendingSales;
+    public string PendingSalesText => Rules.ReportMoney(pendingSales); public string Action => "تعیین برند";
 }
 public sealed class BrandSettingsRow(Brand brand, BrandRate rate)
 {

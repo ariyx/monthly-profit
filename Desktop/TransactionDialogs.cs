@@ -53,6 +53,30 @@ public sealed class BrandEditorDialog : Window
     }
 }
 
+public sealed class BrandAssignmentDialog : Window
+{
+    public string? BrandName { get; private set; }
+    public BrandAssignmentDialog(CatalogItem item, IEnumerable<Brand> brands)
+    {
+        Title = "تعیین برند کالا"; Width = 520; Height = 300; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
+        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
+        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nفروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
+        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(body, 1); root.Children.Add(body);
+        body.Children.Add(DialogUi.Label("برند"));
+        var choices = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList();
+        var picker = new ComboBox { ItemsSource = choices, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right, SelectedIndex = choices.Count == 1 ? 0 : -1 }; body.Children.Add(picker);
+        var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
+        var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
+        var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
+        save.Click += (_, _) =>
+        {
+            if (picker.SelectedItem is not string name || string.IsNullOrWhiteSpace(name)) { error.Text = "یک برند انتخاب کنید."; return; }
+            BrandName = name; DialogResult = true;
+        };
+    }
+}
+
 public sealed class SaleDialog : Window
 {
     readonly Ledger ledger;
@@ -84,16 +108,17 @@ public sealed class SaleDialog : Window
         var cleanDate = Rules.Digits(date.Text); var cleanCode = Rules.Normalize(code.Text); var cleanName = Rules.Normalize(name.Text);
         if (!Rules.ValidDate(cleanDate) || string.IsNullOrWhiteSpace(cleanCode) || string.IsNullOrWhiteSpace(cleanName)) throw new InvalidDataException("تاریخ، کد و نام کالا الزامی هستند.");
         var found = ledger.Items.FirstOrDefault(x => x.Code.Equals(cleanCode, StringComparison.OrdinalIgnoreCase));
-        var brand = found?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, cleanCode)?.Name ?? throw new InvalidOperationException("برای این کد، برند تعیین نشده است. ابتدا برند یا پیشوند آن را مشخص کنید.");
+        var brand = found?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, cleanCode)?.Name ?? "";
         item = found ?? new CatalogItem { Code = cleanCode, Name = cleanName, Brand = brand };
-        if (!Rules.Normalize(item.Brand).Equals(Rules.Normalize(brand), StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException("کد کالا با برند دیگری ثبت شده است.");
-        var rate = BrandMonthRules.RequireConfirmed(ledger, brand, Rules.MonthOf(cleanDate));
         var qty = Rules.Number(quantity.Text); var unit = Rules.Number(price.Text); var total = qty * unit;
-        var sale = BrandMonthRules.Apply(new Sale { Date = cleanDate, Code = cleanCode, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = total, Deductions = Rules.Number(deductions.Text) }, rate, Rules.MonthOf(cleanDate));
+        var sale = new Sale { Date = cleanDate, Code = cleanCode, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = total, Deductions = Rules.Number(deductions.Text) };
+        var month = Rules.MonthOf(cleanDate); var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, month);
+        if (rate is not null) sale = BrandMonthRules.Apply(sale, rate, month);
         Rules.Validate(sale); return sale;
     }
     static string Preview(Sale sale)
     {
+        if (!Rules.HasRateSnapshot(sale)) return "این فروش ذخیره می‌شود، اما تا تعیین برند و تأیید درصدهای همان ماه در محاسبات سود وارد نخواهد شد.";
         var value = LedgerCalculator.PreviewSale(sale);
         return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل تخمینی: {Rules.ReportMoney(value.Cost)} ریال\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال";
     }
@@ -127,13 +152,15 @@ public sealed class SaleEditorDialog : Window
     Sale Read()
     {
         var cleanDate = Rules.Digits(date.Text); var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(original.Code, StringComparison.OrdinalIgnoreCase)) ?? throw new InvalidDataException("کالای فروش یافت نشد.");
-        var month = Rules.MonthOf(cleanDate); var rate = BrandMonthRules.RequireConfirmed(ledger, item.Brand, month);
+        var month = Rules.MonthOf(cleanDate);
         var qty = Rules.Number(quantity.Text); var unit = Rules.Number(price.Text);
         decimal? overrideCost = manual.IsChecked == true ? Rules.Number(manualCost.Text) : null;
-        var next = BrandMonthRules.Apply(original with { Date = cleanDate, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = qty * unit, Deductions = Rules.Number(deductions.Text), EstimatedCostOverride = overrideCost, EstimatedCostOverrideNote = manual.IsChecked == true ? Rules.Normalize(manualReason.Text) : "" }, rate, month);
+        var raw = original with { Date = cleanDate, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = qty * unit, Deductions = Rules.Number(deductions.Text), EstimatedCostOverride = overrideCost, EstimatedCostOverrideNote = manual.IsChecked == true ? Rules.Normalize(manualReason.Text) : "", RateMonthKey = "", CashShare = 0, CreditShare = 0, CashDiscount = 0, PurchaseDiscount = 0, Offer = 0, Markup = 0 };
+        var rate = string.IsNullOrWhiteSpace(item.Brand) ? null : BrandMonthRules.TryConfirmed(ledger, item.Brand, month);
+        var next = rate is null ? raw : BrandMonthRules.Apply(raw, rate, month);
         Rules.Validate(next); return next;
     }
-    static string Preview(Sale sale) { var value = LedgerCalculator.PreviewSale(sale); return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال"; }
+    static string Preview(Sale sale) { if (!Rules.HasRateSnapshot(sale)) return "این فروش تا تعیین برند و تأیید درصدهای ماه، در محاسبه سود وارد نمی‌شود."; var value = LedgerCalculator.PreviewSale(sale); return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال"; }
 }
 
 public sealed class FixedExpensesDialog : Window

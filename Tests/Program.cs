@@ -79,6 +79,24 @@ public static void Main()
     Test.True(!nextDraft.IsConfirmed, "inherited month still requires confirmation");
     Test.Throws(() => BrandMonthRules.RequireConfirmed(ledger, fikores.Name, "1405/07"), "unconfirmed month blocks sale");
 
+    var discounted = BrandMonthRules.Apply(new Sale { Id = "sale-discount", Date = "14050627", Code = item.Code, Customer = "مشتری", Quantity = 1, UnitPrice = 1_040_000m, Total = 1_040_000m, Deductions = 40_000m }, BrandMonthRules.RequireConfirmed(ledger, fikores.Name, "1405/06"), "1405/06");
+    var discountedResult = LedgerCalculator.PreviewSale(discounted);
+    Test.Equal(985_000m, discountedResult.Sales, "invoice deductions and cash discount are not double counted");
+
+    var unknownItem = new CatalogItem { Code = "999001", Name = "کالای بی‌برند" };
+    var pendingSale = new Sale { Id = "sale-pending", Date = "14050702", Code = unknownItem.Code, Customer = "مشتری", Quantity = 2, UnitPrice = 500_000m, Total = 1_000_000m, Deductions = 0 };
+    var pendingLedger = ledger with { Items = [.. ledger.Items, unknownItem], Sales = [pendingSale] };
+    var pendingCalculation = LedgerCalculator.Calculate(pendingLedger);
+    Test.True(!pendingCalculation.Sales.ContainsKey(pendingSale.Id), "unknown-brand sale is retained but not calculated");
+    var pendingTotal = LedgerCalculator.SummarizeMonth(pendingLedger, new Month { Key = "1405/07" }, pendingCalculation);
+    Test.Equal(1, pendingTotal.PendingSalesCount, "pending sale count");
+    Test.Equal(1_000_000m, pendingTotal.PendingInvoiceSales, "pending invoice amount");
+    pendingLedger = pendingLedger with { Items = [item, unknownItem with { Brand = fikores.Name }] };
+    pendingLedger = BrandMonthRules.ApplyPendingSalesForItem(pendingLedger, unknownItem.Code);
+    Test.True(!Rules.HasRateSnapshot(pendingLedger.Sales.Single()), "brand assignment waits for month confirmation");
+    pendingLedger = BrandMonthRules.Confirm(pendingLedger, "1405/07", BrandMonthRules.DraftFor(pendingLedger, "1405/07").Rates);
+    Test.True(Rules.HasRateSnapshot(pendingLedger.Sales.Single()), "confirmed brand month calculates assigned pending sale");
+
     var dbPath = System.IO.Path.Combine(root, "monthly-profit.sqlite");
     var store = new Store(dbPath);
     store.Save(new Month { Key = "1405/06" });
