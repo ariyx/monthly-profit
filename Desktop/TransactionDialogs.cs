@@ -58,11 +58,12 @@ public sealed class BrandAssignmentDialog : Window
     public string? BrandName { get; private set; }
     public BrandAssignmentDialog(CatalogItem item, IEnumerable<Brand> brands)
     {
-        Title = "تعیین برند کالا"; Width = 520; Height = 300; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "تعیین برند کالا"; Width = 520; Height = 300; MinHeight = 250; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nفروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
-        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(body, 1); root.Children.Add(body);
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var body = new StackPanel(); scroll.Content = body;
         body.Children.Add(DialogUi.Label("برند"));
         var choices = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList();
         var picker = new ComboBox { ItemsSource = choices, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right, SelectedIndex = choices.Count == 1 ? 0 : -1 }; body.Children.Add(picker);
