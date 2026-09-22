@@ -35,6 +35,8 @@ public sealed record Brand
 public sealed record BrandRate
 {
     public string BrandName { get; init; } = "";
+    // تأیید درصدها مستقل از برندهای دیگر و فقط برای همین ماه است.
+    public bool IsConfirmed { get; init; }
     public decimal PurchaseDiscount { get; init; }
     public decimal Offer { get; init; }
     public decimal Markup { get; init; } = .04m;
@@ -75,41 +77,50 @@ public static class BrandMonthRules
         if (exact != null)
         {
             var saved = exact.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase);
-            var rates = ledger.Brands.Select(b => saved.TryGetValue(Rules.Normalize(b.Name), out var rate) ? rate with { BrandName = b.Name } : FromBrand(b)).ToList();
-            return exact with { Rates = rates, IsConfirmed = exact.IsConfirmed && rates.Count == exact.Rates.Count };
+            // تنظیمات ذخیره‌شده پیش از این نسخه، تأییدشان در سطح ماه بوده است؛
+            // آن‌ها را یک‌بار معادل تأیید همهٔ برندهای موجود همان ماه در نظر می‌گیریم.
+            var rates = ledger.Brands.Select(b => saved.TryGetValue(Rules.Normalize(b.Name), out var rate)
+                ? rate with { BrandName = b.Name, IsConfirmed = rate.IsConfirmed || exact.IsConfirmed }
+                : FromBrand(b)).ToList();
+            return exact with { Rates = rates, IsConfirmed = rates.All(x => x.IsConfirmed) };
         }
         var source = ledger.BrandMonths.Where(x => x.IsConfirmed && string.CompareOrdinal(x.MonthKey, monthKey) < 0).OrderByDescending(x => x.MonthKey, StringComparer.Ordinal).FirstOrDefault();
         var previous = source?.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, BrandRate>(StringComparer.OrdinalIgnoreCase);
-        var draft = ledger.Brands.Select(b => previous.TryGetValue(Rules.Normalize(b.Name), out var rate) ? rate with { BrandName = b.Name } : FromBrand(b)).ToList();
+        // ماهی که هنوز تنظیمات مستقل ندارد، با آخرین مقادیر معتبر پر می‌شود
+        // اما تأیید درصدها برای همان ماه لازم است.
+        var draft = ledger.Brands.Select(b => previous.TryGetValue(Rules.Normalize(b.Name), out var rate) ? rate with { BrandName = b.Name, IsConfirmed = false } : FromBrand(b)).ToList();
         return new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = source?.MonthKey ?? "تنظیمات پیش‌فرض", Rates = draft };
     }
 
     public static bool IsConfirmed(Ledger ledger, string monthKey) => DraftFor(ledger, monthKey).IsConfirmed;
 
+    public static IReadOnlyList<BrandRate> UnconfirmedRates(Ledger ledger, string monthKey) =>
+        DraftFor(ledger, monthKey).Rates.Where(x => !x.IsConfirmed).ToList();
+
     public static BrandRate RequireConfirmed(Ledger ledger, string brandName, string monthKey)
     {
-        var month = DraftFor(ledger, monthKey);
-        if (!month.IsConfirmed) throw new InvalidOperationException($"تنظیمات برندهای ماه {monthKey} هنوز تأیید نشده است.");
         return TryConfirmed(ledger, brandName, monthKey)
-            ?? throw new InvalidOperationException($"برای برند «{brandName}» در ماه {monthKey} تنظیمی وجود ندارد.");
+            ?? throw new InvalidOperationException($"درصدهای برند «{brandName}» در ماه {monthKey} هنوز تأیید نشده است.");
     }
 
     public static BrandRate? TryConfirmed(Ledger ledger, string brandName, string monthKey)
     {
         var month = DraftFor(ledger, monthKey);
-        if (!month.IsConfirmed) return null;
-        return month.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase));
+        return month.Rates.FirstOrDefault(x => x.IsConfirmed && Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase));
     }
 
     public static Ledger Confirm(Ledger ledger, string monthKey, IEnumerable<BrandRate> values)
     {
-        var rates = values.Select(x => x with { BrandName = Rules.Normalize(x.BrandName) }).ToList();
-        foreach (var rate in rates) Validate(rate);
-        var expected = ledger.Brands.Select(x => Rules.Normalize(x.Name)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
-        var actual = rates.Select(x => Rules.Normalize(x.BrandName)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
-        if (!expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase) || actual.Distinct(StringComparer.OrdinalIgnoreCase).Count() != actual.Count) throw new InvalidDataException("جدول ماهانه باید دقیقاً یک ردیف برای هر برند فعال داشته باشد.");
         var draft = DraftFor(ledger, monthKey);
-        var confirmed = new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = draft.SourceMonthKey, IsConfirmed = true, ConfirmedAtUtc = DateTime.UtcNow, Rates = rates };
+        var submitted = values.Select(x => x with { BrandName = Rules.Normalize(x.BrandName), IsConfirmed = true }).ToList();
+        foreach (var rate in submitted) Validate(rate);
+        var names = ledger.Brands.Select(x => Rules.Normalize(x.Name)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (submitted.Count == 0 || submitted.Any(x => !names.Contains(x.BrandName)) || submitted.Select(x => x.BrandName).Distinct(StringComparer.OrdinalIgnoreCase).Count() != submitted.Count)
+            throw new InvalidDataException("تنظیمات تأییدشدهٔ برند نامعتبر است.");
+        var replacements = submitted.ToDictionary(x => x.BrandName, StringComparer.OrdinalIgnoreCase);
+        var rates = draft.Rates.Select(x => replacements.TryGetValue(Rules.Normalize(x.BrandName), out var next) ? next with { BrandName = x.BrandName } : x).ToList();
+        var allConfirmed = rates.All(x => x.IsConfirmed);
+        var confirmed = new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = draft.SourceMonthKey, IsConfirmed = allConfirmed, ConfirmedAtUtc = allConfirmed ? DateTime.UtcNow : draft.ConfirmedAtUtc, Rates = rates };
         var staged = ledger with { BrandMonths = [.. ledger.BrandMonths.Where(x => x.MonthKey != monthKey), confirmed] };
         var items = staged.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
         var sales = staged.Sales.Select(sale =>
@@ -118,9 +129,29 @@ public static class BrandMonthRules
             if (!items.TryGetValue(sale.Code, out var item)) throw new InvalidDataException($"کالای کد {sale.Code} یافت نشد.");
             // فروشِ کالای بی‌برند در دفتر باقی می‌ماند، اما تا زمان تعیین برند محاسبه نمی‌شود.
             if (string.IsNullOrWhiteSpace(item.Brand)) return sale;
-            return Apply(sale, RequireConfirmed(staged, item.Brand, monthKey), monthKey);
+            var rate = TryConfirmed(staged, item.Brand, monthKey);
+            return rate is null ? sale : Apply(sale, rate, monthKey);
         }).ToList();
         return staged with { Sales = sales };
+    }
+
+    public static Ledger AddBrandToMonths(Ledger ledger, IEnumerable<string> monthKeys)
+    {
+        var keys = monthKeys.Where(Rules.ValidMonth).Concat(ledger.BrandMonths.Select(x => x.MonthKey)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToList();
+        var settings = ledger.BrandMonths.Where(x => !keys.Contains(x.MonthKey, StringComparer.Ordinal)).ToList();
+        foreach (var key in keys)
+        {
+            var draft = DraftFor(ledger, key);
+            settings.Add(new BrandMonthSettings
+            {
+                MonthKey = key,
+                SourceMonthKey = draft.SourceMonthKey,
+                IsConfirmed = draft.Rates.All(x => x.IsConfirmed),
+                ConfirmedAtUtc = draft.Rates.All(x => x.IsConfirmed) ? draft.ConfirmedAtUtc : null,
+                Rates = draft.Rates
+            });
+        }
+        return ledger with { BrandMonths = settings };
     }
 
     // پس از تعیین برندِ یک کد ناشناخته، فروش‌های معلقِ ماه‌های تأییدشده همان کد Snapshot می‌گیرند.
@@ -166,6 +197,12 @@ public static class BrandPrefixRules
 
     public static List<string> Parse(string? value) => (value ?? "").Split([',', '،', ';', '؛', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Rules.Digits).Where(x => x.Length > 0).Distinct(StringComparer.Ordinal).ToList();
     public static string Display(IEnumerable<string> prefixes) => string.Join("، ", prefixes);
+    public static string ExtractPrefix(string code)
+    {
+        var digits = Rules.Digits(code);
+        if (digits.Length < 3) throw new InvalidDataException("کد کالا باید حداقل سه رقم داشته باشد تا پیشوند آن استخراج شود.");
+        return digits[..3];
+    }
     public static Brand? Detect(IEnumerable<Brand> brands, string code) => brands.SelectMany(b => b.CodePrefixes.Select(p => (Brand: b, Prefix: Rules.Digits(p))))
         .Where(x => x.Prefix.Length > 0 && Rules.Digits(code).StartsWith(x.Prefix, StringComparison.Ordinal)).OrderByDescending(x => x.Prefix.Length).Select(x => x.Brand).FirstOrDefault();
     public static void ValidateUnique(IEnumerable<Brand> brands)

@@ -56,24 +56,25 @@ public sealed class BrandEditorDialog : Window
 public sealed class BrandAssignmentDialog : Window
 {
     public string? BrandName { get; private set; }
-    public BrandAssignmentDialog(CatalogItem item, IEnumerable<Brand> brands)
+    public BrandAssignmentDialog(CatalogItem item)
     {
         Title = "تعیین برند کالا"; Width = 520; Height = 300; MinHeight = 250; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nفروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
+        var prefix = BrandPrefixRules.ExtractPrefix(item.Code);
+        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nپیشوند «{prefix}» خودکار ثبت می‌شود و همهٔ کدهای ناشناختهٔ هم‌پیشوند به این برند متصل خواهند شد."));
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
         var body = new StackPanel(); scroll.Content = body;
-        body.Children.Add(DialogUi.Label("برند"));
-        var choices = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList();
-        var picker = new ComboBox { ItemsSource = choices, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right, SelectedIndex = choices.Count == 1 ? 0 : -1 }; body.Children.Add(picker);
+        body.Children.Add(DialogUi.Label("نام برند"));
+        var name = DialogUi.Input(); body.Children.Add(name);
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
         var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
         save.Click += (_, _) =>
         {
-            if (picker.SelectedItem is not string name || string.IsNullOrWhiteSpace(name)) { error.Text = "یک برند انتخاب کنید."; return; }
-            BrandName = name; DialogResult = true;
+            BrandName = Rules.Normalize(name.Text);
+            if (string.IsNullOrWhiteSpace(BrandName)) { error.Text = "نام برند را وارد کنید."; return; }
+            DialogResult = true;
         };
     }
 }

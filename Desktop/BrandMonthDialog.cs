@@ -27,14 +27,17 @@ public sealed class BrandMonthConfirmationDialog : Window
     readonly List<RateRow> rows;
     public List<BrandRate>? Value { get; private set; }
 
-    public BrandMonthConfirmationDialog(BrandMonthSettings draft)
+    public BrandMonthConfirmationDialog(BrandMonthSettings draft, IEnumerable<string>? brandNames = null)
     {
-        rows = draft.Rates.OrderBy(x => x.BrandName, StringComparer.OrdinalIgnoreCase).Select(RateRow.From).ToList();
-        Title = $"تأیید تنظیمات برندهای {draft.MonthKey}";
+        var selected = brandNames == null ? draft.Rates.Where(x => !x.IsConfirmed) : draft.Rates.Where(x => brandNames.Contains(x.BrandName, StringComparer.OrdinalIgnoreCase));
+        rows = selected.OrderBy(x => x.BrandName, StringComparer.OrdinalIgnoreCase).Select(RateRow.From).ToList();
+        if (rows.Count == 0) throw new InvalidOperationException("درصد تأییدنشده‌ای برای این ماه وجود ندارد.");
+        var title = rows.Count == 1 ? $"تأیید درصدهای برند «{rows[0].BrandName}»" : "تأیید درصدهای برندها";
+        Title = $"{title} در {draft.MonthKey}";
         Width = 1120; Height = 650; MinWidth = 860; MinHeight = 480; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header($"تأیید درصدهای برند در ماه {draft.MonthKey}", $"مقادیر از «{draft.SourceMonthKey}» برای شروع پر شده‌اند. تأیید این ماه فقط Snapshot فروش‌های همین ماه را هماهنگ می‌کند."));
+        root.Children.Add(DialogUi.Header($"{title} در ماه {draft.MonthKey}", $"مقادیر از «{draft.SourceMonthKey}» برای شروع پر شده‌اند. تأیید فقط فروش‌های همین برند در همین ماه را محاسبه می‌کند."));
         var body = new Grid { Margin = new Thickness(22, 18, 22, 12) }; body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
         body.Children.Add(new TextBlock { Text = "همه اعداد درصد هستند. جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.", Foreground = new SolidColorBrush(Color.FromRgb(84, 98, 124)), FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 0, 0, 10) });
         var grid = new DataGrid { AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false, CanUserDeleteRows = false, ItemsSource = rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, MinHeight = 160 };
