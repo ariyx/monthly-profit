@@ -32,7 +32,7 @@ public sealed class BrandEditorDialog : Window
     public BrandEditorDialog(Brand? value, BrandRate? monthlyRate = null, string? monthKey = null)
     {
         Title = value == null ? "افزودن برند" : "ویرایش برند";
-        Width = 620; Height = monthlyRate == null ? 340 : 700; MinHeight = monthlyRate == null ? 340 : 600; ResizeMode = monthlyRate == null ? ResizeMode.NoResize : ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 620; Height = monthlyRate == null ? 470 : 700; MinHeight = monthlyRate == null ? 470 : 600; ResizeMode = monthlyRate == null ? ResizeMode.NoResize : ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header(Title, monthlyRate == null ? "درصدهای مالی در تأیید ماهانه ثبت می‌شوند؛ اینجا فقط نام و پیشوند کالا را تعیین کنید." : $"درصدهای برند در ماه {monthKey} نیز از همینجا قابل ویرایش هستند؛ فروش‌های همین برند و ماه دوباره محاسبه می‌شوند."));
@@ -75,24 +75,64 @@ public sealed class BrandEditorDialog : Window
 
 public sealed class BrandAssignmentDialog : Window
 {
-    public string? BrandName { get; private set; }
+    public Brand? Value { get; private set; }
     public BrandAssignmentDialog(CatalogItem item, IEnumerable<Brand> brands)
     {
-        Title = "تعیین برند کالا"; Width = 520; Height = 390; MinHeight = 390; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "تعیین برند کالا"; Width = 620; Height = 720; MinHeight = 720; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nفروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
+        var prefix = Rules.Digits(item.Code); prefix = prefix[..Math.Min(3, prefix.Length)];
+        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nپیشوند «{prefix}» خودکار ثبت می‌شود؛ فروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
         var body = new StackPanel { Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(body, 1); root.Children.Add(body);
-        body.Children.Add(DialogUi.Label("برند"));
-        var choices = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList();
-        var picker = new ComboBox { ItemsSource = choices, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right, SelectedIndex = choices.Count == 1 ? 0 : -1 }; body.Children.Add(picker);
+        body.Children.Add(DialogUi.Label("نام برند"));
+        var brandName = DialogUi.Input(); body.Children.Add(brandName);
+        var rates = new StackPanel { Visibility = Visibility.Collapsed }; body.Children.Add(rates);
+        TextBox PercentField(string label, decimal value)
+        {
+            rates.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, value); rates.Children.Add(input); return input;
+        }
+        var purchaseDiscount = PercentField("تخفیف خرید ٪", 0);
+        var offer = PercentField("آفر ٪", 0);
+        var markup = PercentField("مارک‌آپ ٪", .04m);
+        var cashShare = PercentField("سهم نقدی ٪", .30m);
+        var creditShare = PercentField("سهم چکی ٪", .70m);
+        var cashDiscount = PercentField("تخفیف نقدی ٪", .05m);
+        var lastLoadedName = "";
+        void LoadBrandValues()
+        {
+            var cleanName = Rules.Normalize(brandName.Text);
+            rates.Visibility = string.IsNullOrWhiteSpace(cleanName) ? Visibility.Collapsed : Visibility.Visible;
+            if (string.IsNullOrWhiteSpace(cleanName) || cleanName.Equals(lastLoadedName, StringComparison.OrdinalIgnoreCase)) return;
+            var source = brands.FirstOrDefault(x => Rules.Normalize(x.Name).Equals(cleanName, StringComparison.OrdinalIgnoreCase));
+            if (source != null)
+            {
+                DialogUi.Percent(purchaseDiscount, source.PurchaseDiscount); DialogUi.Percent(offer, source.Offer); DialogUi.Percent(markup, source.Markup);
+                DialogUi.Percent(cashShare, source.CashShare); DialogUi.Percent(creditShare, source.CreditShare); DialogUi.Percent(cashDiscount, source.CashDiscount);
+            }
+            lastLoadedName = cleanName;
+        }
+        brandName.TextChanged += (_, _) => LoadBrandValues();
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
         var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
         save.Click += (_, _) =>
         {
-            if (picker.SelectedItem is not string name || string.IsNullOrWhiteSpace(name)) { error.Text = "یک برند انتخاب کنید."; return; }
-            BrandName = name; DialogResult = true;
+            try
+            {
+                var name = Rules.Normalize(brandName.Text);
+                var existing = brands.FirstOrDefault(x => Rules.Normalize(x.Name).Equals(name, StringComparison.OrdinalIgnoreCase));
+                var prefixes = existing?.CodePrefixes.ToList() ?? [];
+                if (!prefixes.Contains(prefix, StringComparer.Ordinal)) prefixes.Add(prefix);
+                Value = (existing ?? new Brand()) with
+                {
+                    Name = name, CodePrefixes = prefixes,
+                    PurchaseDiscount = DialogUi.Percent(purchaseDiscount), Offer = DialogUi.Percent(offer), Markup = DialogUi.Percent(markup),
+                    CashShare = DialogUi.Percent(cashShare), CreditShare = DialogUi.Percent(creditShare), CashDiscount = DialogUi.Percent(cashDiscount)
+                };
+                Rules.Validate(Value);
+                DialogResult = true;
+            }
+            catch (Exception ex) { error.Text = ex.Message; }
         };
     }
 }

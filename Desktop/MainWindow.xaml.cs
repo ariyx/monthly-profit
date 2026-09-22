@@ -323,12 +323,17 @@ public partial class MainWindow : Window
     {
         if (PendingBrandsGrid.SelectedItem is not UnknownCodeRow row || !CanEdit()) return;
         var dialog = new BrandAssignmentDialog(row.Item, ledger.Brands) { Owner = this };
-        if (dialog.ShowDialog() != true || string.IsNullOrWhiteSpace(dialog.BrandName)) return;
+        if (dialog.ShowDialog() != true || dialog.Value == null) return;
         Guard(() =>
         {
-            var items = ledger.Items.Select(x => x.Code.Equals(row.Item.Code, StringComparison.OrdinalIgnoreCase) ? x with { Brand = dialog.BrandName } : x).ToList();
-            var next = BrandMonthRules.ApplyPendingSalesForItem(ledger with { Items = items }, row.Item.Code);
-            SaveLedger(next, $"برند «{dialog.BrandName}» برای کد {row.Item.Code} ثبت شد.");
+            var brand = dialog.Value;
+            var brands = ledger.Brands.Any(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase))
+                ? ledger.Brands.Select(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase) ? brand : x).ToList()
+                : ledger.Brands.Append(brand).ToList();
+            BrandPrefixRules.ValidateUnique(brands);
+            var items = ledger.Items.Select(x => x.Code.Equals(row.Item.Code, StringComparison.OrdinalIgnoreCase) ? x with { Brand = brand.Name } : x).ToList();
+            var next = BrandMonthRules.ApplyPendingSalesForItem(ledger with { Brands = brands, Items = items }, row.Item.Code);
+            SaveLedger(next, $"برند «{brand.Name}» و پیشوند آن برای کد {row.Item.Code} ثبت شد.");
         });
     }
 
