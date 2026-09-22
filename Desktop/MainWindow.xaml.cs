@@ -337,9 +337,9 @@ public partial class MainWindow : Window
             var existing = ledger.Brands.FirstOrDefault(x => Rules.Normalize(x.Name).Equals(brandName, StringComparison.OrdinalIgnoreCase));
             var owner = BrandPrefixRules.Detect(ledger.Brands, prefix);
             if (owner != null && !Rules.Normalize(owner.Name).Equals(brandName, StringComparison.OrdinalIgnoreCase)) throw new InvalidDataException($"پیشوند «{prefix}» پیش‌تر برای برند «{owner.Name}» ثبت شده است.");
-            var brands = existing == null
-                ? [.. ledger.Brands, new Brand { Name = brandName, CodePrefixes = [prefix] }]
-                : ledger.Brands.Select(x => !Rules.Normalize(x.Name).Equals(brandName, StringComparison.OrdinalIgnoreCase) ? x : x with { CodePrefixes = [.. x.CodePrefixes, prefix].Distinct(StringComparer.Ordinal).ToList() }).ToList();
+            List<Brand> brands = existing == null
+                ? ledger.Brands.Append(new Brand { Name = brandName, CodePrefixes = new List<string> { prefix } }).ToList()
+                : ledger.Brands.Select(x => !Rules.Normalize(x.Name).Equals(brandName, StringComparison.OrdinalIgnoreCase) ? x : x with { CodePrefixes = x.CodePrefixes.Append(prefix).Distinct(StringComparer.Ordinal).ToList() }).ToList();
             BrandPrefixRules.ValidateUnique(brands);
             var items = ledger.Items.Select(x => string.IsNullOrWhiteSpace(x.Brand) && BrandPrefixRules.ExtractPrefix(x.Code) == prefix ? x with { Brand = brandName } : x).ToList();
             var next = BrandMonthRules.AddBrandToMonths(ledger with { Brands = brands, Items = items }, AllMonthKeys());
