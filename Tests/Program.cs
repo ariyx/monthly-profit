@@ -97,16 +97,6 @@ public static void Main()
     pendingLedger = BrandMonthRules.Confirm(pendingLedger, "1405/07", BrandMonthRules.DraftFor(pendingLedger, "1405/07").Rates);
     Test.True(Rules.HasRateSnapshot(pendingLedger.Sales.Single()), "confirmed brand month calculates assigned pending sale");
 
-    // افزودن برند جدید نباید تأیید درصد برندهای قبلی را باطل کند؛ فقط همان برند جدید تأیید می‌شود.
-    var newBrand = new Brand { Name = "برند جدید", CodePrefixes = ["999"] };
-    var expandedLedger = BrandMonthRules.AddBrandToMonths(ledger with { Brands = [.. ledger.Brands, newBrand] }, ["1405/06", "1405/07"]);
-    var expandedJune = BrandMonthRules.DraftFor(expandedLedger, "1405/06");
-    Test.True(expandedJune.Rates.Single(x => x.BrandName == fikores.Name).IsConfirmed, "existing brand confirmation remains valid");
-    Test.True(!expandedJune.Rates.Single(x => x.BrandName == newBrand.Name).IsConfirmed, "new brand requires its own confirmation");
-    expandedLedger = BrandMonthRules.Confirm(expandedLedger, "1405/06", [expandedJune.Rates.Single(x => x.BrandName == newBrand.Name)]);
-    Test.True(BrandMonthRules.TryConfirmed(expandedLedger, newBrand.Name, "1405/06") != null, "new brand confirmation is stored independently");
-    Test.Equal("999", BrandPrefixRules.ExtractPrefix("999001"), "automatic three-digit prefix");
-
     var dbPath = System.IO.Path.Combine(root, "monthly-profit.sqlite");
     var store = new Store(dbPath);
     store.Save(new Month { Key = "1405/06" });

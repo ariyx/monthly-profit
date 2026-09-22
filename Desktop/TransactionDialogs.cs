@@ -28,16 +28,29 @@ static class DialogUi
 public sealed class BrandEditorDialog : Window
 {
     public Brand? Value { get; private set; }
-    public BrandEditorDialog(Brand? value)
+    public BrandRate? RateValue { get; private set; }
+    public BrandEditorDialog(Brand? value, BrandRate? monthlyRate = null, string? monthKey = null)
     {
         Title = value == null ? "افزودن برند" : "ویرایش برند";
-        Width = 560; Height = 340; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 620; Height = monthlyRate == null ? 340 : 700; MinHeight = monthlyRate == null ? 340 : 600; ResizeMode = monthlyRate == null ? ResizeMode.NoResize : ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header(Title, "درصدهای مالی در تأیید ماهانه ثبت می‌شوند؛ اینجا فقط نام و پیشوند کالا را تعیین کنید."));
-        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(body, 1); root.Children.Add(body);
+        root.Children.Add(DialogUi.Header(Title, monthlyRate == null ? "درصدهای مالی در تأیید ماهانه ثبت می‌شوند؛ اینجا فقط نام و پیشوند کالا را تعیین کنید." : $"درصدهای برند در ماه {monthKey} نیز از همینجا قابل ویرایش هستند؛ فروش‌های همین برند و ماه دوباره محاسبه می‌شوند."));
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
+        var body = new StackPanel(); scroll.Content = body;
         body.Children.Add(DialogUi.Label("نام برند")); var name = DialogUi.Input(value?.Name ?? ""); body.Children.Add(name);
         body.Children.Add(DialogUi.Label("پیشوند کد کالا (با «،» جدا کنید)")); var prefixes = DialogUi.Input(value == null ? "" : BrandPrefixRules.Display(value.CodePrefixes)); body.Children.Add(prefixes);
+        TextBox? purchaseDiscount = null, offer = null, markup = null, cashShare = null, creditShare = null, cashDiscount = null;
+        if (monthlyRate != null)
+        {
+            TextBox PercentField(string label, decimal amount) { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, amount); body.Children.Add(input); return input; }
+            purchaseDiscount = PercentField("تخفیف خرید ٪", monthlyRate.PurchaseDiscount);
+            offer = PercentField("آفر ٪", monthlyRate.Offer);
+            markup = PercentField("مارک‌آپ ٪", monthlyRate.Markup);
+            cashShare = PercentField("سهم نقدی ٪", monthlyRate.CashShare);
+            creditShare = PercentField("سهم چکی ٪", monthlyRate.CreditShare);
+            cashDiscount = PercentField("تخفیف نقدی ٪", monthlyRate.CashDiscount);
+        }
         var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
         var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
@@ -46,7 +59,14 @@ public sealed class BrandEditorDialog : Window
             try
             {
                 Value = (value ?? new Brand { Markup = .04m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }) with { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text) };
-                Rules.Validate(Value); DialogResult = true;
+                Rules.Validate(Value);
+                if (monthlyRate != null)
+                {
+                    var rate = monthlyRate with { BrandName = Value.Name, PurchaseDiscount = DialogUi.Percent(purchaseDiscount!), Offer = DialogUi.Percent(offer!), Markup = DialogUi.Percent(markup!), CashShare = DialogUi.Percent(cashShare!), CreditShare = DialogUi.Percent(creditShare!), CashDiscount = DialogUi.Percent(cashDiscount!) };
+                    BrandMonthRules.Validate(rate);
+                    RateValue = rate;
+                }
+                DialogResult = true;
             }
             catch (Exception ex) { error.Text = ex.Message; }
         };
@@ -56,25 +76,23 @@ public sealed class BrandEditorDialog : Window
 public sealed class BrandAssignmentDialog : Window
 {
     public string? BrandName { get; private set; }
-    public BrandAssignmentDialog(CatalogItem item)
+    public BrandAssignmentDialog(CatalogItem item, IEnumerable<Brand> brands)
     {
-        Title = "تعیین برند کالا"; Width = 520; Height = 300; MinHeight = 250; ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "تعیین برند کالا"; Width = 520; Height = 390; MinHeight = 390; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        var prefix = BrandPrefixRules.ExtractPrefix(item.Code);
-        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nپیشوند «{prefix}» خودکار ثبت می‌شود و همهٔ کدهای ناشناختهٔ هم‌پیشوند به این برند متصل خواهند شد."));
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        var body = new StackPanel(); scroll.Content = body;
-        body.Children.Add(DialogUi.Label("نام برند"));
-        var name = DialogUi.Input(); body.Children.Add(name);
+        root.Children.Add(DialogUi.Header("تعیین برند کالا", $"کد {item.Code} · {item.Name}\nفروش‌های این کالا فقط پس از تأیید درصدهای همان ماه محاسبه می‌شوند."));
+        var body = new StackPanel { Margin = new Thickness(24, 20, 24, 12) }; Grid.SetRow(body, 1); root.Children.Add(body);
+        body.Children.Add(DialogUi.Label("برند"));
+        var choices = brands.OrderBy(x => x.Name).Select(x => x.Name).ToList();
+        var picker = new ComboBox { ItemsSource = choices, FlowDirection = FlowDirection.RightToLeft, HorizontalContentAlignment = HorizontalAlignment.Right, SelectedIndex = choices.Count == 1 ? 0 : -1 }; body.Children.Add(picker);
         var error = new TextBlock { Foreground = Brushes.Firebrick, Margin = new Thickness(0, 8, 0, 0), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
         var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var save = new Button { Content = "ثبت برند", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
         save.Click += (_, _) =>
         {
-            BrandName = Rules.Normalize(name.Text);
-            if (string.IsNullOrWhiteSpace(BrandName)) { error.Text = "نام برند را وارد کنید."; return; }
-            DialogResult = true;
+            if (picker.SelectedItem is not string name || string.IsNullOrWhiteSpace(name)) { error.Text = "یک برند انتخاب کنید."; return; }
+            BrandName = name; DialogResult = true;
         };
     }
 }
@@ -88,12 +106,11 @@ public sealed class SaleDialog : Window
     public CatalogItem? Item { get; private set; }
     public SaleDialog(Ledger ledger, string dateValue)
     {
-        this.ledger = ledger; Title = "ثبت فروش"; Width = 780; Height = 690; MinHeight = 580; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        this.ledger = ledger; Title = "ثبت فروش"; Width = 780; Height = 820; MinHeight = 820; ResizeMode = ResizeMode.NoResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header("ثبت فروش", "هزینه خرید این فروش خودکار از قیمت فروش و درصدهای برند همان ماه استخراج می‌شود."));
-        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(24, 18, 24, 8) }; Grid.SetRow(scroll, 1); root.Children.Add(scroll);
-        var body = new StackPanel(); scroll.Content = body;
+        var body = new StackPanel { Margin = new Thickness(24, 18, 24, 8) }; Grid.SetRow(body, 1); root.Children.Add(body);
         (TextBox, TextBox) Field(string label, string value = "") { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(value); body.Children.Add(input); return (input, input); }
         date = Field("تاریخ (مانند 14050627)", dateValue).Item1; code = Field("کد کالا").Item1; name = Field("نام کالا").Item1; customer = Field("مشتری").Item1; quantity = Field("تعداد").Item1; price = Field("قیمت فروش واحد — ریال").Item1; deductions = Field("کسورات فاکتور — ریال", "0").Item1;
         MoneyInput.Attach(quantity); MoneyInput.Attach(price); MoneyInput.Attach(deductions);

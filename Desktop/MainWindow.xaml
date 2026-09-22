@@ -189,9 +189,9 @@
 </Border>
 <Border Width="1" Height="36" Background="#E4E8EF" Margin="10,0" VerticalAlignment="Center"/>
 <WrapPanel FlowDirection="RightToLeft" VerticalAlignment="Center">
-<Button Content="چاپ ماه فعال" Click="PrintReport"/>
-<Button Content="خروجی ماه فعال" Click="ExportExcel"/>
-<Button Content="خروجی بازه" Click="ExportRange" Style="{StaticResource Primary}"/>
+<Button Content="پرینت ماه فعال" Click="PrintReport"/>
+<Button Content="خروجی اکسل ماه فعال" Click="ExportExcel"/>
+<Button Content="خروجی اکسل بازه" Click="ExportRange" Style="{StaticResource Primary}"/>
 </WrapPanel>
 </WrapPanel>
 </DockPanel>
