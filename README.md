@@ -41,18 +41,6 @@ dotnet run --project Desktop/Profit.Desktop.csproj
 
 The application is a WPF app and can only run on Windows. The .NET CLI commands themselves are shell-independent; use a terminal appropriate to your platform.
 
-## Configuration and data
-
-Monthly Profit has no environment variables, service credentials, or external configuration files.
-
-On Windows, the application stores its database at:
-
-```text
-%LOCALAPPDATA%\MonthlyProfit\Data\monthly-profit.sqlite
-```
-
-Backups are SQLite database files. Create a manual backup before restoring data or upgrading an existing installation. When automatic backups are enabled in the application, they run on exit; the default retention is eight recent copies.
-
 ## Typical workflow
 
 1. Select or create a Persian calendar month.
