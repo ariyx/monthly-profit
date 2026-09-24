@@ -331,9 +331,12 @@ public partial class MainWindow : Window
                 ? ledger.Brands.Select(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase) ? brand : x).ToList()
                 : ledger.Brands.Append(brand).ToList();
             BrandPrefixRules.ValidateUnique(brands);
-            var items = ledger.Items.Select(x => x.Code.Equals(row.Item.Code, StringComparison.OrdinalIgnoreCase) ? x with { Brand = brand.Name } : x).ToList();
-            var next = BrandMonthRules.ApplyPendingSalesForItem(ledger with { Brands = brands, Items = items }, row.Item.Code);
-            SaveLedger(next, $"برند «{brand.Name}» و پیشوند آن برای کد {row.Item.Code} ثبت شد.");
+            var prefix = Rules.Digits(row.Item.Code); prefix = prefix[..Math.Min(3, prefix.Length)];
+            var affectedCodes = ledger.Items.Where(x => string.IsNullOrWhiteSpace(x.Brand) && Rules.Digits(x.Code).StartsWith(prefix, StringComparison.Ordinal)).Select(x => x.Code).ToList();
+            var items = ledger.Items.Select(x => affectedCodes.Contains(x.Code, StringComparer.OrdinalIgnoreCase) ? x with { Brand = brand.Name } : x).ToList();
+            var next = ledger with { Brands = brands, Items = items };
+            foreach (var code in affectedCodes) next = BrandMonthRules.ApplyPendingSalesForItem(next, code);
+            SaveLedger(next, $"برند «{brand.Name}» برای {affectedCodes.Count} کد ناشناخته با پیشوند {prefix} ثبت شد.");
         });
     }
 
