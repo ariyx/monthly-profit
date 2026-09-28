@@ -75,7 +75,9 @@
 <Border Grid.Column="0" Style="{StaticResource Panel}">
 <StackPanel FlowDirection="RightToLeft" HorizontalAlignment="Stretch">
 <TextBlock Text="ترکیب عملکرد" Style="{StaticResource CardTitle}"/>
-<TextBlock x:Name="Breakdown" Foreground="#172033" LineHeight="29" TextWrapping="Wrap" Margin="0,14,0,0" HorizontalAlignment="Stretch" TextAlignment="Right"/>
+<Grid HorizontalAlignment="Stretch" Margin="0,14,0,0" FlowDirection="RightToLeft">
+<TextBlock x:Name="Breakdown" Foreground="#172033" LineHeight="29" TextWrapping="Wrap" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" TextAlignment="Right"/>
+</Grid>
 </StackPanel>
 </Border>
 <Border Grid.Column="1" Style="{StaticResource Panel}" VerticalAlignment="Top">
@@ -103,7 +105,6 @@
 <DataGridTextColumn Header="فروش" Binding="{Binding SalesText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="سود خالص فروش" Binding="{Binding ProfitText}" Width="1.35*" ElementStyle="{StaticResource TableNumber}"/>
 <DataGridTextColumn Header="حاشیه سود" Binding="{Binding MarginText}" Width="0.85*" ElementStyle="{StaticResource TableNumber}"/>
-<DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.05*" ElementStyle="{StaticResource TableText}"/>
 </DataGrid.Columns>
 </DataGrid>
 </StackPanel>

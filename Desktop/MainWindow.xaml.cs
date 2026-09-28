@@ -111,10 +111,7 @@ public partial class MainWindow : Window
         Net.Foreground = color; NetLabel.Text = Outcome(total.Net); NetLabel.Foreground = color;
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.IndianRed : Brushes.SeaGreen;
         Fixed.Text = Rules.Money(current.FixedCost);
-        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nبهای تمام‌شده فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}" +
-            (total.ReturnedQuantity == 0 ? "" : $"\nبرگشت اعمال‌شده: {Rules.Money(total.ReturnedQuantity)} واحد در {total.AppliedReturnsCount} سند") +
-            (total.PendingReturnsCount == 0 ? "" : $"\n{total.PendingReturnsCount} برگشت در این ماه تطبیق کافی ندارد و معلق است.") +
-            (total.PendingSalesCount == 0 ? "" : $"\n{total.PendingSalesCount} فروش به مبلغ {Rules.ReportMoney(total.PendingInvoiceSales)} ریال، منتظر تعیین برند یا تأیید تنظیمات است.");
+        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nبهای تمام‌شده فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}";
         DrawSales(); DrawBrands(); DrawBrandSettings(); DrawUnknown(); DrawHistory(); DrawBackupStatus();
         Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده" +
             (total.ReturnedQuantity == 0 ? "" : $" · {Rules.Money(total.ReturnedQuantity)} واحد برگشتی") +
