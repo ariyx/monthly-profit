@@ -53,6 +53,14 @@ public static void Main()
     var prefixRate = BrandMonthRules.RequireConfirmed(exactLedger, prefixBrand.Name, "1405/06");
     var shampooRate = BrandMonthRules.RequireConfirmed(exactLedger, shampooBrand.Name, "1405/06");
     Test.Equal(1.50m, shampooRate.Markup, "exact-code brand keeps its own monthly settings");
+    var previouslyAssigned = exactLedger with
+    {
+        Items = [new CatalogItem { Code = "11890329", Name = "Existing exact product", Brand = prefixBrand.Name }],
+        Sales = [BrandMonthRules.Apply(new Sale { Id = "existing-exact-sale", Date = "14050627", Code = "11890329", Customer = "test", Quantity = 1, UnitPrice = 250m, Total = 250m }, prefixRate, "1405/06")]
+    };
+    var migratedExact = BrandMonthRules.ApplyExactProductCodeAssignments(previouslyAssigned);
+    Test.Equal(shampooBrand.Name, migratedExact.Items.Single().Brand, "existing exact-code item moves from prefix brand");
+    Test.Equal(1.50m, migratedExact.Sales.Single().Markup, "existing exact-code sale refreshes its independent snapshot");
     var exactSale = BrandMonthRules.Apply(new Sale { Id = "exact-sale", Date = "14050627", Code = "11890329", Customer = "test", Quantity = 1, UnitPrice = 250m, Total = 250m }, shampooRate, "1405/06");
     var prefixSale = BrandMonthRules.Apply(new Sale { Id = "prefix-sale", Date = "14050627", Code = "11800000", Customer = "test", Quantity = 1, UnitPrice = 104m, Total = 104m }, prefixRate, "1405/06");
     exactLedger = exactLedger with { Sales = [exactSale, prefixSale] };

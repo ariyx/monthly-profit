@@ -141,6 +141,28 @@ public static class BrandMonthRules
         return ledger with { Sales = sales };
     }
 
+    public static Ledger ApplyExactProductCodeAssignments(Ledger ledger)
+    {
+        var exactBrands = ledger.Items.Select(item => (Item: item, Brand: BrandPrefixRules.DetectExact(ledger.Brands, item.Code)))
+            .Where(x => x.Brand is not null && !Rules.Normalize(x.Item.Brand).Equals(Rules.Normalize(x.Brand!.Name), StringComparison.OrdinalIgnoreCase))
+            .ToDictionary(x => x.Item.Code, x => x.Brand!.Name, StringComparer.OrdinalIgnoreCase);
+        if (exactBrands.Count == 0) return ledger;
+
+        var staged = ledger with { Items = ledger.Items.Select(item => exactBrands.TryGetValue(item.Code, out var brand) ? item with { Brand = brand } : item).ToList() };
+        var sales = staged.Sales.Select(sale =>
+        {
+            if (!exactBrands.TryGetValue(sale.Code, out var brand)) return sale;
+            var monthKey = Rules.MonthOf(sale.Date);
+            var rate = TryConfirmed(staged, brand, monthKey);
+            return rate is null ? sale with
+            {
+                CashShare = 0, CreditShare = 0, CashDiscount = 0, PurchaseDiscount = 0, Offer = 0, Markup = 0, RateMonthKey = "",
+                EstimatedCostOverride = null, EstimatedCostOverrideNote = ""
+            } : Apply(sale, rate, monthKey);
+        }).ToList();
+        return staged with { Sales = sales };
+    }
+
     static bool HasSnapshot(Sale sale) => Rules.HasRateSnapshot(sale);
 
     public static Sale Apply(Sale sale, BrandRate rate, string monthKey) => sale with
@@ -172,9 +194,14 @@ public static class BrandPrefixRules
     {
         var normalizedCode = Rules.Digits(code);
         var allBrands = brands.ToList();
-        var exact = allBrands.FirstOrDefault(b => b.ExactProductCodes.Any(x => Rules.Digits(x).Equals(normalizedCode, StringComparison.Ordinal)));
+        var exact = DetectExact(allBrands, normalizedCode);
         return exact ?? allBrands.SelectMany(b => b.CodePrefixes.Select(p => (Brand: b, Prefix: Rules.Digits(p))))
             .Where(x => x.Prefix.Length > 0 && normalizedCode.StartsWith(x.Prefix, StringComparison.Ordinal)).OrderByDescending(x => x.Prefix.Length).Select(x => x.Brand).FirstOrDefault();
+    }
+    public static Brand? DetectExact(IEnumerable<Brand> brands, string code)
+    {
+        var normalizedCode = Rules.Digits(code);
+        return brands.FirstOrDefault(b => b.ExactProductCodes.Any(x => Rules.Digits(x).Equals(normalizedCode, StringComparison.Ordinal)));
     }
     public static void ValidateUnique(IEnumerable<Brand> brands)
     {

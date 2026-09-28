@@ -64,6 +64,7 @@ public partial class MainWindow : Window
     {
         var raw = store.LoadLedger();
         ledger = BrandPrefixRules.EnsureDefaults(raw);
+        ledger = BrandMonthRules.ApplyExactProductCodeAssignments(ledger);
         if (ledger != raw) store.SaveLedger(ledger);
         var keys = store.Keys();
         if (keys.Count == 0) { store.EnsureMonth(CurrentMonth()); keys = store.Keys(); }
@@ -117,6 +118,7 @@ public partial class MainWindow : Window
     void SaveLedger(Ledger next, string action, string? month = null)
     {
         if (month != null && !CanEdit(month)) throw new InvalidOperationException($"ماه {month} بسته است.");
+        next = BrandMonthRules.ApplyExactProductCodeAssignments(next);
         store.SaveLedger(next); Reload(); Status.Text = action;
     }
     void SaveMonth(Month next, string action)
