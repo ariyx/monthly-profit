@@ -24,6 +24,7 @@ public sealed record Brand
 {
     public string Name { get; init; } = "";
     public List<string> CodePrefixes { get; init; } = [];
+    public List<string> ExactProductCodes { get; init; } = [];
     public decimal PurchaseDiscount { get; init; }
     public decimal Offer { get; init; }
     public decimal Markup { get; init; } = .04m;
@@ -63,7 +64,8 @@ public static class BrandMonthRules
     public static void Validate(BrandRate rate)
     {
         if (string.IsNullOrWhiteSpace(rate.BrandName) || rate.BrandName.Trim().Length > 120) throw new InvalidDataException("نام برند در تنظیمات ماهانه نامعتبر است.");
-        if (new[] { rate.PurchaseDiscount, rate.Offer, rate.Markup, rate.CreditShare, rate.CashShare, rate.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای ماهانه برند باید بین صفر و ۱۰۰ باشند.");
+        if (rate.Markup < 0) throw new InvalidDataException("مارک‌آپ برند نمی‌تواند منفی باشد.");
+        if (new[] { rate.PurchaseDiscount, rate.Offer, rate.CreditShare, rate.CashShare, rate.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای ماهانه برند باید بین صفر و ۱۰۰ باشند.");
         if (rate.PurchaseDiscount + rate.Offer > 1) throw new InvalidDataException("جمع تخفیف خرید و آفر نباید از ۱۰۰٪ بیشتر باشد.");
         if (rate.CashShare + rate.CreditShare != 1) throw new InvalidDataException("جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.");
     }
@@ -166,12 +168,20 @@ public static class BrandPrefixRules
 
     public static List<string> Parse(string? value) => (value ?? "").Split([',', '،', ';', '؛', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(Rules.Digits).Where(x => x.Length > 0).Distinct(StringComparer.Ordinal).ToList();
     public static string Display(IEnumerable<string> prefixes) => string.Join("، ", prefixes);
-    public static Brand? Detect(IEnumerable<Brand> brands, string code) => brands.SelectMany(b => b.CodePrefixes.Select(p => (Brand: b, Prefix: Rules.Digits(p))))
-        .Where(x => x.Prefix.Length > 0 && Rules.Digits(code).StartsWith(x.Prefix, StringComparison.Ordinal)).OrderByDescending(x => x.Prefix.Length).Select(x => x.Brand).FirstOrDefault();
+    public static Brand? Detect(IEnumerable<Brand> brands, string code)
+    {
+        var normalizedCode = Rules.Digits(code);
+        var allBrands = brands.ToList();
+        var exact = allBrands.FirstOrDefault(b => b.ExactProductCodes.Any(x => Rules.Digits(x).Equals(normalizedCode, StringComparison.Ordinal)));
+        return exact ?? allBrands.SelectMany(b => b.CodePrefixes.Select(p => (Brand: b, Prefix: Rules.Digits(p))))
+            .Where(x => x.Prefix.Length > 0 && normalizedCode.StartsWith(x.Prefix, StringComparison.Ordinal)).OrderByDescending(x => x.Prefix.Length).Select(x => x.Brand).FirstOrDefault();
+    }
     public static void ValidateUnique(IEnumerable<Brand> brands)
     {
         var duplicate = brands.SelectMany(b => b.CodePrefixes.Select(p => (Prefix: Rules.Digits(p), Brand: Rules.Normalize(b.Name)))).Where(x => x.Prefix.Length > 0).GroupBy(x => x.Prefix).FirstOrDefault(x => x.Select(y => y.Brand).Distinct().Count() > 1);
         if (duplicate != null) throw new InvalidDataException($"پیشوند کد «{duplicate.Key}» برای بیش از یک برند ثبت شده است.");
+        var duplicateExact = brands.SelectMany(b => b.ExactProductCodes.Select(c => (Code: Rules.Digits(c), Brand: Rules.Normalize(b.Name)))).Where(x => x.Code.Length > 0).GroupBy(x => x.Code).FirstOrDefault(x => x.Select(y => y.Brand).Distinct().Count() > 1);
+        if (duplicateExact != null) throw new InvalidDataException($"کد کالای دقیق «{duplicateExact.Key}» برای بیش از یک برند ثبت شده است.");
     }
     public static Ledger EnsureDefaults(Ledger ledger)
     {
@@ -262,7 +272,7 @@ public static class Rules
     }
     public static void Validate(Brand brand)
     {
-        if (string.IsNullOrWhiteSpace(brand.Name) || brand.Name.Trim().Length > 120 || brand.CodePrefixes.Any(x => x.Length < 2 || x.Length > 12 || !x.All(char.IsDigit))) throw new InvalidDataException("مشخصات برند نامعتبر است.");
+        if (string.IsNullOrWhiteSpace(brand.Name) || brand.Name.Trim().Length > 120 || brand.CodePrefixes.Any(x => x.Length < 2 || x.Length > 12 || !x.All(char.IsDigit)) || brand.ExactProductCodes.Any(x => x.Length == 0 || x.Length > 60 || !x.All(char.IsDigit))) throw new InvalidDataException("مشخصات برند نامعتبر است.");
         BrandMonthRules.Validate(BrandMonthRules.FromBrand(brand));
     }
     public static void Validate(CatalogItem item)
@@ -277,7 +287,7 @@ public static class Rules
             if (sale.EstimatedCostOverride.HasValue) throw new InvalidDataException("هزینهٔ دستی فقط برای فروشِ دارای برند و تنظیمات تأییدشده مجاز است.");
             return;
         }
-        if (sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.Markup > 1 || sale.EstimatedCostOverride < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.EstimatedCostOverride < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
         if (sale.RateMonthKey != MonthOf(sale.Date)) throw new InvalidDataException("ماه Snapshot فروش با تاریخ آن سازگار نیست.");
         if (sale.EstimatedCostOverride.HasValue && string.IsNullOrWhiteSpace(sale.EstimatedCostOverrideNote)) throw new InvalidDataException("برای هزینهٔ دستی فروش، دلیل را وارد کنید.");
     }

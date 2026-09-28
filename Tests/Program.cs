@@ -33,6 +33,25 @@ public static void Main()
     var item = new CatalogItem { Code = "106001", Name = "کالای آزمایشی", Brand = fikores.Name };
     var ledger = new Ledger { Brands = [fikores], Items = [item] };
 
+    var prefixBrand = new Brand { Name = "Salome", CodePrefixes = ["118"] };
+    var shampooBrand = new Brand { Name = "Shampoo Salome", ExactProductCodes = ["11890329"], Markup = 1.50m };
+    var creamBrand = new Brand { Name = "Cream Salome", ExactProductCodes = ["11832944"], Markup = 2.50m };
+    var exactBrands = new[] { prefixBrand, shampooBrand, creamBrand };
+    Test.Equal(shampooBrand.Name, BrandPrefixRules.Detect(exactBrands, "11890329")!.Name, "exact code overrides matching prefix");
+    Test.Equal(prefixBrand.Name, BrandPrefixRules.Detect(exactBrands, "11800000")!.Name, "prefix detects when no exact code exists");
+    Test.Equal(creamBrand.Name, BrandPrefixRules.Detect(exactBrands, "11832944")!.Name, "exact codes under one prefix map to separate brands");
+    Test.Throws(() => BrandPrefixRules.ValidateUnique([shampooBrand, creamBrand with { ExactProductCodes = ["11890329"] }]), "duplicate exact codes are rejected");
+    var legacyLedger = System.Text.Json.JsonSerializer.Deserialize<Ledger>("{\"Brands\":[{\"Name\":\"Legacy\",\"CodePrefixes\":[\"118\"]}]}", Rules.Json)!;
+    Test.Equal("Legacy", BrandPrefixRules.Detect(legacyLedger.Brands, "118777")!.Name, "prefix-only saved data remains compatible");
+    BrandMonthRules.Validate(new BrandRate { BrandName = "Markup 150", Markup = 1.50m, CashShare = .30m, CreditShare = .70m });
+    BrandMonthRules.Validate(new BrandRate { BrandName = "Markup 250", Markup = 2.50m, CashShare = .30m, CreditShare = .70m });
+    var markup150 = new Sale { Date = "14050627", Code = "11890329", Customer = "test", Quantity = 1, UnitPrice = 250m, Total = 250m, CashShare = .30m, CreditShare = .70m, Markup = 1.50m, RateMonthKey = "1405/06" };
+    var markup250 = markup150 with { UnitPrice = 350m, Total = 350m, Markup = 2.50m };
+    Test.Equal(100m, LedgerCalculator.PreviewSale(markup150).GrossPurchaseUnit, "150 percent markup calculation");
+    Test.Equal(100m, LedgerCalculator.PreviewSale(markup250).GrossPurchaseUnit, "250 percent markup calculation");
+    Test.Throws(() => BrandMonthRules.Validate(new BrandRate { BrandName = "Negative", Markup = -.01m, CashShare = .30m, CreditShare = .70m }), "negative markup is rejected");
+    Test.Throws(() => BrandMonthRules.Validate(new BrandRate { BrandName = "Discount", PurchaseDiscount = 1.01m, CashShare = .30m, CreditShare = .70m }), "non-markup percentage upper limit remains");
+    Test.Throws(() => BrandMonthRules.Validate(new BrandRate { BrandName = "Shares", CashShare = .31m, CreditShare = .70m }), "cash and credit shares must total 100 percent");
     var draft = BrandMonthRules.DraftFor(ledger, "1405/06");
     Test.True(!draft.IsConfirmed && draft.SourceMonthKey == "تنظیمات پیش‌فرض", "first month must require confirmation");
     Test.Equal(.25m, fikores.PurchaseDiscount, "default purchase discount");

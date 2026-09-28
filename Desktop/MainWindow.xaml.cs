@@ -332,7 +332,7 @@ public partial class MainWindow : Window
                 : ledger.Brands.Append(brand).ToList();
             BrandPrefixRules.ValidateUnique(brands);
             var prefix = Rules.Digits(row.Item.Code); prefix = prefix[..Math.Min(3, prefix.Length)];
-            var affectedCodes = ledger.Items.Where(x => string.IsNullOrWhiteSpace(x.Brand) && Rules.Digits(x.Code).StartsWith(prefix, StringComparison.Ordinal)).Select(x => x.Code).ToList();
+            var affectedCodes = ledger.Items.Where(x => string.IsNullOrWhiteSpace(x.Brand) && Rules.Normalize(BrandPrefixRules.Detect(brands, x.Code)?.Name ?? "").Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase)).Select(x => x.Code).ToList();
             var items = ledger.Items.Select(x => affectedCodes.Contains(x.Code, StringComparer.OrdinalIgnoreCase) ? x with { Brand = brand.Name } : x).ToList();
             var next = ledger with { Brands = brands, Items = items };
             foreach (var code in affectedCodes) next = BrandMonthRules.ApplyPendingSalesForItem(next, code);

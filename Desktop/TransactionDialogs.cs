@@ -32,7 +32,7 @@ public sealed class BrandEditorDialog : Window
     public BrandEditorDialog(Brand? value, BrandRate? monthlyRate = null, string? monthKey = null)
     {
         Title = value == null ? "افزودن برند" : "ویرایش برند";
-        Width = 620; Height = monthlyRate == null ? 470 : 700; MinHeight = monthlyRate == null ? 470 : 600; ResizeMode = monthlyRate == null ? ResizeMode.NoResize : ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Width = 620; Height = monthlyRate == null ? 540 : 760; MinHeight = monthlyRate == null ? 540 : 600; ResizeMode = monthlyRate == null ? ResizeMode.NoResize : ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
         var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
         root.Children.Add(DialogUi.Header(Title, monthlyRate == null ? "درصدهای مالی در تأیید ماهانه ثبت می‌شوند؛ اینجا فقط نام و پیشوند کالا را تعیین کنید." : $"درصدهای برند در ماه {monthKey} نیز از همینجا قابل ویرایش هستند؛ فروش‌های همین برند و ماه دوباره محاسبه می‌شوند."));
@@ -40,6 +40,7 @@ public sealed class BrandEditorDialog : Window
         var body = new StackPanel(); scroll.Content = body;
         body.Children.Add(DialogUi.Label("نام برند")); var name = DialogUi.Input(value?.Name ?? ""); body.Children.Add(name);
         body.Children.Add(DialogUi.Label("پیشوند کد کالا (با «،» جدا کنید)")); var prefixes = DialogUi.Input(value == null ? "" : BrandPrefixRules.Display(value.CodePrefixes)); body.Children.Add(prefixes);
+        body.Children.Add(DialogUi.Label("کد دقیق کالا (اختیاری؛ با «،»، ; یا خط جدید جدا کنید)")); var exactCodes = DialogUi.Input(value == null ? "" : BrandPrefixRules.Display(value.ExactProductCodes)); body.Children.Add(exactCodes);
         TextBox? purchaseDiscount = null, offer = null, markup = null, cashShare = null, creditShare = null, cashDiscount = null;
         if (monthlyRate != null)
         {
@@ -58,7 +59,7 @@ public sealed class BrandEditorDialog : Window
         {
             try
             {
-                Value = (value ?? new Brand { Markup = .04m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }) with { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text) };
+                Value = (value ?? new Brand { Markup = .04m, CashShare = .30m, CreditShare = .70m, CashDiscount = .05m }) with { Name = Rules.Normalize(name.Text), CodePrefixes = BrandPrefixRules.Parse(prefixes.Text), ExactProductCodes = BrandPrefixRules.Parse(exactCodes.Text) };
                 Rules.Validate(Value);
                 if (monthlyRate != null)
                 {
