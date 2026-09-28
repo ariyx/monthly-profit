@@ -41,6 +41,23 @@ public static void Main()
     Test.Equal(prefixBrand.Name, BrandPrefixRules.Detect(exactBrands, "11800000")!.Name, "prefix detects when no exact code exists");
     Test.Equal(creamBrand.Name, BrandPrefixRules.Detect(exactBrands, "11832944")!.Name, "exact codes under one prefix map to separate brands");
     Test.Throws(() => BrandPrefixRules.ValidateUnique([shampooBrand, creamBrand with { ExactProductCodes = ["11890329"] }]), "duplicate exact codes are rejected");
+    var exactItems = new[]
+    {
+        new CatalogItem { Code = "11800000", Name = "Prefix product", Brand = BrandPrefixRules.Detect(exactBrands, "11800000")!.Name },
+        new CatalogItem { Code = "11890329", Name = "Exact product", Brand = BrandPrefixRules.Detect(exactBrands, "11890329")!.Name }
+    };
+    var exactLedger = new Ledger { Brands = exactBrands.ToList(), Items = exactItems.ToList() };
+    var exactDraft = BrandMonthRules.DraftFor(exactLedger, "1405/06");
+    Test.Equal(3, exactDraft.Rates.Count, "exact-code brand receives an independent monthly rate");
+    exactLedger = BrandMonthRules.Confirm(exactLedger, "1405/06", exactDraft.Rates);
+    var prefixRate = BrandMonthRules.RequireConfirmed(exactLedger, prefixBrand.Name, "1405/06");
+    var shampooRate = BrandMonthRules.RequireConfirmed(exactLedger, shampooBrand.Name, "1405/06");
+    Test.Equal(1.50m, shampooRate.Markup, "exact-code brand keeps its own monthly settings");
+    var exactSale = BrandMonthRules.Apply(new Sale { Id = "exact-sale", Date = "14050627", Code = "11890329", Customer = "test", Quantity = 1, UnitPrice = 250m, Total = 250m }, shampooRate, "1405/06");
+    var prefixSale = BrandMonthRules.Apply(new Sale { Id = "prefix-sale", Date = "14050627", Code = "11800000", Customer = "test", Quantity = 1, UnitPrice = 104m, Total = 104m }, prefixRate, "1405/06");
+    exactLedger = exactLedger with { Sales = [exactSale, prefixSale] };
+    Test.Equal(1.50m, exactLedger.Sales.Single(x => x.Code == "11890329").Markup, "exact-code sale uses the independent brand snapshot");
+    Test.Equal(2, LedgerCalculator.SummarizeMonth(exactLedger, new Month { Key = "1405/06" }).Brands, "exact-code sale remains separate in brand reporting");
     var legacyLedger = System.Text.Json.JsonSerializer.Deserialize<Ledger>("{\"Brands\":[{\"Name\":\"Legacy\",\"CodePrefixes\":[\"118\"]}]}", Rules.Json)!;
     Test.Equal("Legacy", BrandPrefixRules.Detect(legacyLedger.Brands, "118777")!.Name, "prefix-only saved data remains compatible");
     BrandMonthRules.Validate(new BrandRate { BrandName = "Markup 150", Markup = 1.50m, CashShare = .30m, CreditShare = .70m });
