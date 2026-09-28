@@ -1,11 +1,13 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
+using System.Printing;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using Microsoft.Win32;
 using Profit.Core;
 
@@ -405,19 +407,107 @@ public partial class MainWindow : Window
     void PrintReport(object s, RoutedEventArgs e)
     {
         if (!ResolveFixedEdit()) return;
-        Guard(() => { var print = new PrintDialog(); if (print.ShowDialog() != true) return; var total = LedgerCalculator.SummarizeMonth(ledger, current, calculation); var doc = new FlowDocument { FlowDirection = FlowDirection.RightToLeft, FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 11, PagePadding = new Thickness(35), ColumnWidth = double.PositiveInfinity, PageWidth = print.PrintableAreaWidth }; doc.Blocks.Add(new Paragraph(new Run("گزارش سود فروش")) { FontSize = 21, FontWeight = FontWeights.Bold }); doc.Blocks.Add(new Paragraph(new Run($"ماه {current.Key} — فروش واقعی: {Rules.ReportMoney(total.Sales)} ریال — هزینه تخمینی: {Rules.ReportMoney(total.Cost)} ریال — سود خالص فروش: {Rules.ReportMoney(total.Profit)} ریال — نتیجه: {Rules.ReportMoney(total.Net)} ریال"))); print.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, "Monthly Profit " + current.Key); });
+        Guard(() =>
+        {
+            var print = new PrintDialog();
+            if (print.PrintTicket != null) print.PrintTicket.PageOrientation = PageOrientation.Landscape;
+            if (print.ShowDialog() != true) return;
+            print.PrintDocument(((IDocumentPaginatorSource)CreatePrintDocument(print)).DocumentPaginator, "Monthly Profit " + current.Key);
+        });
     }
     void ExportExcel(object s, RoutedEventArgs e)
     {
         if (!ResolveFixedEdit()) return;
         var file = new SaveFileDialog { Filter = "Excel workbook|*.xlsx", FileName = "MonthlyProfit-" + current.Key.Replace('/', '-') + ".xlsx" };
-        if (file.ShowDialog(this) == true) Guard(() => { ExcelTransfer.ExportLedgerMonth(ledger, current, file.FileName); Status.Text = "خروجی اکسل ماه فعال ذخیره شد."; });
+        if (file.ShowDialog(this) == true) Guard(() => { ExcelTransfer.ExportLedgerMonth(ledger, current, file.FileName, CompanyLogoBytes()); Status.Text = "خروجی اکسل ماه فعال ذخیره شد."; });
     }
     void ExportRange(object s, RoutedEventArgs e)
     {
         if (!ResolveFixedEdit() || reportMonths.Count == 0) { MessageBox.Show(this, "ابتدا یک بازه معتبر انتخاب کنید."); return; }
         var file = new SaveFileDialog { Filter = "Excel workbook|*.xlsx", FileName = $"MonthlyProfit-Range-{reportMonths.First().Key.Replace('/', '-')}-{reportMonths.Last().Key.Replace('/', '-')}.xlsx" };
-        if (file.ShowDialog(this) == true) Guard(() => { ExcelTransfer.ExportLedgerRange(ledger, reportMonths, file.FileName); Status.Text = "خروجی اکسل بازه ذخیره شد."; });
+        if (file.ShowDialog(this) == true) Guard(() => { ExcelTransfer.ExportLedgerRange(ledger, reportMonths, file.FileName, CompanyLogoBytes()); Status.Text = "خروجی اکسل بازه ذخیره شد."; });
+    }
+
+    static byte[]? CompanyLogoBytes()
+    {
+        var resource = Application.GetResourceStream(new Uri("pack://application:,,,/Assets/company-logo-cropped.png", UriKind.Absolute));
+        if (resource?.Stream is null) return null;
+        using var buffer = new MemoryStream(); resource.Stream.CopyTo(buffer); return buffer.ToArray();
+    }
+
+    FlowDocument CreatePrintDocument(PrintDialog print)
+    {
+        var total = LedgerCalculator.SummarizeMonth(ledger, current, calculation);
+        var document = new FlowDocument
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            FontSize = 9.5,
+            PagePadding = new Thickness(28),
+            ColumnWidth = double.PositiveInfinity,
+            PageWidth = print.PrintableAreaWidth,
+            PageHeight = print.PrintableAreaHeight,
+            TextAlignment = TextAlignment.Right
+        };
+        var heading = new Paragraph { Margin = new Thickness(0, 0, 0, 2), FontSize = 18, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51)) };
+        var logo = new BitmapImage(new Uri("pack://application:,,,/Assets/company-logo-cropped.png", UriKind.Absolute));
+        heading.Inlines.Add(new InlineUIContainer(new Image { Source = logo, Width = 42, Height = 42, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 10, 0) }) { BaselineAlignment = BaselineAlignment.Center });
+        heading.Inlines.Add(new Run("شرکت متحد توزیع ایرانیان"));
+        document.Blocks.Add(heading);
+        document.Blocks.Add(new Paragraph(new Run($"گزارش سود فروش ماه {current.Key}  |  تهیه‌شده در {DateTime.Now:yyyy/MM/dd HH:mm}")) { Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 16), FontSize = 10 });
+
+        var kpis = new[]
+        {
+            ("فروش واقعی", Rules.ReportMoney(total.Sales)), ("بهای تمام‌شده", Rules.ReportMoney(total.Cost)),
+            ("سود خالص فروش", Rules.ReportMoney(total.Profit)), ("هزینه ثابت", Rules.ReportMoney(total.FixedCost)),
+            ("نتیجه نهایی", Rules.ReportMoney(total.Net))
+        };
+        var kpiTable = new Table { CellSpacing = 0, Margin = new Thickness(0, 0, 0, 16) };
+        foreach (var _ in kpis) kpiTable.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var kpiGroup = new TableRowGroup(); kpiTable.RowGroups.Add(kpiGroup);
+        var kpiHeader = new TableRow(); kpiGroup.Rows.Add(kpiHeader);
+        var kpiValues = new TableRow(); kpiGroup.Rows.Add(kpiValues);
+        foreach (var (label, value) in kpis)
+        {
+            kpiHeader.Cells.Add(PrintCell(label, true));
+            var valueCell = PrintCell(value, false); valueCell.Foreground = label == "نتیجه نهایی" ? total.Net < 0 ? Brushes.Firebrick : Brushes.SeaGreen : new SolidColorBrush(Color.FromRgb(23, 32, 51)); valueCell.FontWeight = FontWeights.SemiBold; kpiValues.Cells.Add(valueCell);
+        }
+        document.Blocks.Add(kpiTable);
+
+        document.Blocks.Add(new Paragraph(new Run("جزئیات فروش‌های ماه")) { FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51)), Margin = new Thickness(0, 0, 0, 7) });
+        var details = new Table { CellSpacing = 0 };
+        var headers = new[] { "تاریخ", "مشتری", "کالا", "برند", "تعداد", "برگشتی", "خالص", "دریافتی", "بهای تمام‌شده", "سود", "وضعیت" };
+        var widths = new[] { 0.72, 1.45, 1.8, 0.9, 0.55, 0.6, 0.55, 1.05, 1.1, 1.0, 1.0 };
+        foreach (var width in widths) details.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
+        var group = new TableRowGroup(); details.RowGroups.Add(group);
+        var header = new TableRow(); group.Rows.Add(header); foreach (var label in headers) header.Cells.Add(PrintCell(label, true));
+        var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        foreach (var sale in ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderBy(x => x.Date).ThenBy(x => x.Id))
+        {
+            var settlement = calculation.Sales.GetValueOrDefault(sale.Id); var item = items[sale.Code];
+            var row = new TableRow(); group.Rows.Add(row);
+            var status = settlement is null ? "معلق" : settlement.ReturnCount > 0 ? "برگشت اعمال‌شده" : "محاسبه‌شده";
+            var values = new[]
+            {
+                sale.Date, sale.Customer, item.Name, string.IsNullOrWhiteSpace(item.Brand) ? "تعیین‌نشده" : item.Brand,
+                Rules.Money(sale.Quantity), settlement is null ? "—" : Rules.Money(settlement.ReturnedQuantity), settlement is null ? "—" : Rules.Money(sale.Quantity - settlement.ReturnedQuantity),
+                settlement is null ? "—" : Rules.ReportMoney(settlement.Sales), settlement is null ? "—" : Rules.ReportMoney(settlement.Cost), settlement is null ? "—" : Rules.ReportMoney(settlement.Profit), status
+            };
+            foreach (var value in values) row.Cells.Add(PrintCell(value, false));
+        }
+        document.Blocks.Add(details);
+        document.Blocks.Add(new Paragraph(new Run($"برگشت اعمال‌شده: {Rules.Money(total.ReturnedQuantity)} واحد در {total.AppliedReturnsCount} سند" + (total.PendingReturnsCount == 0 ? "" : $"  |  برگشت معلق: {total.PendingReturnsCount}"))) { Foreground = Brushes.DimGray, Margin = new Thickness(0, 12, 0, 0), FontSize = 9 });
+        return document;
+    }
+
+    static TableCell PrintCell(string text, bool header)
+    {
+        var paragraph = new Paragraph(new Run(text)) { Margin = new Thickness(0), TextAlignment = header ? TextAlignment.Center : TextAlignment.Right, LineHeight = 15 };
+        return new TableCell(paragraph)
+        {
+            Padding = new Thickness(5, 4, 5, 4), BorderBrush = new SolidColorBrush(Color.FromRgb(220, 227, 236)), BorderThickness = new Thickness(.45),
+            Background = header ? new SolidColorBrush(Color.FromRgb(23, 32, 51)) : Brushes.White, Foreground = header ? Brushes.White : new SolidColorBrush(Color.FromRgb(23, 32, 51)), FontWeight = header ? FontWeights.SemiBold : FontWeights.Normal
+        };
     }
     void Backup(object s, RoutedEventArgs e)
     {
