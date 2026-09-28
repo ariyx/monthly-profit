@@ -122,8 +122,9 @@ public static class ExcelTransfer
                     return new XElement(S + "worksheet",
                         new XAttribute(XNamespace.Xmlns + "r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships"),
                         new XElement(S + "sheetViews", new XElement(S + "sheetView", new XAttribute("workbookViewId", "0"), new XAttribute("rightToLeft", "1"), new XElement(S + "pane", new XAttribute("ySplit", headerRow), new XAttribute("topLeftCell", "A6"), new XAttribute("activePane", "bottomLeft"), new XAttribute("state", "frozen")))),
-                        columns, sheetData, merges,
+                        columns, sheetData,
                         new XElement(S + "autoFilter", new XAttribute("ref", $"A{headerRow}:{Column(data[0].Length)}{headerRow + data.Count - 1}")),
+                        merges,
                         new XElement(S + "pageMargins", new XAttribute("left", ".25"), new XAttribute("right", ".25"), new XAttribute("top", ".45"), new XAttribute("bottom", ".45"), new XAttribute("header", ".2"), new XAttribute("footer", ".2")),
                         new XElement(S + "pageSetup", new XAttribute("orientation", "landscape"), new XAttribute("fitToWidth", "1"), new XAttribute("fitToHeight", "0")),
                         includeLogo ? new XElement(S + "drawing", new XAttribute(XNamespace.Get("http://schemas.openxmlformats.org/officeDocument/2006/relationships") + "id", "rId1")) : null);

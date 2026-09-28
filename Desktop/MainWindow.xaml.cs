@@ -446,12 +446,21 @@ public partial class MainWindow : Window
             PageHeight = print.PrintableAreaHeight,
             TextAlignment = TextAlignment.Right
         };
-        var heading = new Paragraph { Margin = new Thickness(0, 0, 0, 2), FontSize = 18, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51)) };
+        var heading = new Paragraph
+        {
+            Margin = new Thickness(0, 0, 0, 2), FontSize = 18, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51)), FlowDirection = FlowDirection.RightToLeft,
+            TextAlignment = TextAlignment.Right
+        };
         var logo = new BitmapImage(new Uri("pack://application:,,,/Assets/company-logo-cropped.png", UriKind.Absolute));
         heading.Inlines.Add(new InlineUIContainer(new Image { Source = logo, Width = 42, Height = 42, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, 10, 0) }) { BaselineAlignment = BaselineAlignment.Center });
         heading.Inlines.Add(new Run("شرکت متحد توزیع ایرانیان"));
         document.Blocks.Add(heading);
-        document.Blocks.Add(new Paragraph(new Run($"گزارش سود فروش ماه {current.Key}  |  تهیه‌شده در {DateTime.Now:yyyy/MM/dd HH:mm}")) { Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 16), FontSize = 10 });
+        document.Blocks.Add(new Paragraph(new Run($"گزارش سود فروش ماه {current.Key}  |  تهیه‌شده در {DateTime.Now:yyyy/MM/dd HH:mm}"))
+        {
+            Foreground = Brushes.DimGray, Margin = new Thickness(0, 0, 0, 16), FontSize = 10,
+            FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Right
+        });
 
         var kpis = new[]
         {
@@ -459,7 +468,11 @@ public partial class MainWindow : Window
             ("سود خالص فروش", Rules.ReportMoney(total.Profit)), ("هزینه ثابت", Rules.ReportMoney(total.FixedCost)),
             ("نتیجه نهایی", Rules.ReportMoney(total.Net))
         };
-        var kpiTable = new Table { CellSpacing = 0, Margin = new Thickness(0, 0, 0, 16) };
+        var kpiTable = new Table
+        {
+            CellSpacing = 0, Margin = new Thickness(0), FlowDirection = FlowDirection.RightToLeft,
+            TextAlignment = TextAlignment.Right
+        };
         foreach (var _ in kpis) kpiTable.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
         var kpiGroup = new TableRowGroup(); kpiTable.RowGroups.Add(kpiGroup);
         var kpiHeader = new TableRow(); kpiGroup.Rows.Add(kpiHeader);
@@ -470,30 +483,6 @@ public partial class MainWindow : Window
             var valueCell = PrintCell(value, false); valueCell.Foreground = label == "نتیجه نهایی" ? total.Net < 0 ? Brushes.Firebrick : Brushes.SeaGreen : new SolidColorBrush(Color.FromRgb(23, 32, 51)); valueCell.FontWeight = FontWeights.SemiBold; kpiValues.Cells.Add(valueCell);
         }
         document.Blocks.Add(kpiTable);
-
-        document.Blocks.Add(new Paragraph(new Run("جزئیات فروش‌های ماه")) { FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(23, 32, 51)), Margin = new Thickness(0, 0, 0, 7) });
-        var details = new Table { CellSpacing = 0 };
-        var headers = new[] { "تاریخ", "مشتری", "کالا", "برند", "تعداد", "برگشتی", "خالص", "دریافتی", "بهای تمام‌شده", "سود", "وضعیت" };
-        var widths = new[] { 0.72, 1.45, 1.8, 0.9, 0.55, 0.6, 0.55, 1.05, 1.1, 1.0, 1.0 };
-        foreach (var width in widths) details.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
-        var group = new TableRowGroup(); details.RowGroups.Add(group);
-        var header = new TableRow(); group.Rows.Add(header); foreach (var label in headers) header.Cells.Add(PrintCell(label, true));
-        var items = ledger.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        foreach (var sale in ledger.Sales.Where(x => Rules.MonthOf(x.Date) == current.Key).OrderBy(x => x.Date).ThenBy(x => x.Id))
-        {
-            var settlement = calculation.Sales.GetValueOrDefault(sale.Id); var item = items[sale.Code];
-            var row = new TableRow(); group.Rows.Add(row);
-            var status = settlement is null ? "معلق" : settlement.ReturnCount > 0 ? "برگشت اعمال‌شده" : "محاسبه‌شده";
-            var values = new[]
-            {
-                sale.Date, sale.Customer, item.Name, string.IsNullOrWhiteSpace(item.Brand) ? "تعیین‌نشده" : item.Brand,
-                Rules.Money(sale.Quantity), settlement is null ? "—" : Rules.Money(settlement.ReturnedQuantity), settlement is null ? "—" : Rules.Money(sale.Quantity - settlement.ReturnedQuantity),
-                settlement is null ? "—" : Rules.ReportMoney(settlement.Sales), settlement is null ? "—" : Rules.ReportMoney(settlement.Cost), settlement is null ? "—" : Rules.ReportMoney(settlement.Profit), status
-            };
-            foreach (var value in values) row.Cells.Add(PrintCell(value, false));
-        }
-        document.Blocks.Add(details);
-        document.Blocks.Add(new Paragraph(new Run($"برگشت اعمال‌شده: {Rules.Money(total.ReturnedQuantity)} واحد در {total.AppliedReturnsCount} سند" + (total.PendingReturnsCount == 0 ? "" : $"  |  برگشت معلق: {total.PendingReturnsCount}"))) { Foreground = Brushes.DimGray, Margin = new Thickness(0, 12, 0, 0), FontSize = 9 });
         return document;
     }
 
