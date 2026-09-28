@@ -109,9 +109,14 @@ public partial class MainWindow : Window
         Net.Foreground = color; NetLabel.Text = Outcome(total.Net); NetLabel.Foreground = color;
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.IndianRed : Brushes.SeaGreen;
         Fixed.Text = Rules.Money(current.FixedCost);
-        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nبهای تمام‌شده فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}" + (total.PendingSalesCount == 0 ? "" : $"\n{total.PendingSalesCount} فروش به مبلغ {Rules.ReportMoney(total.PendingInvoiceSales)} ریال، منتظر تعیین برند یا تأیید تنظیمات است.");
+        Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nبهای تمام‌شده فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}" +
+            (total.ReturnedQuantity == 0 ? "" : $"\nبرگشت اعمال‌شده: {Rules.Money(total.ReturnedQuantity)} واحد در {total.AppliedReturnsCount} سند") +
+            (total.PendingReturnsCount == 0 ? "" : $"\n{total.PendingReturnsCount} برگشت در این ماه تطبیق کافی ندارد و معلق است.") +
+            (total.PendingSalesCount == 0 ? "" : $"\n{total.PendingSalesCount} فروش به مبلغ {Rules.ReportMoney(total.PendingInvoiceSales)} ریال، منتظر تعیین برند یا تأیید تنظیمات است.");
         DrawSales(); DrawBrands(); DrawBrandSettings(); DrawUnknown(); DrawHistory(); DrawBackupStatus();
-        Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده" + (total.PendingSalesCount == 0 ? "" : $" · {total.PendingSalesCount} فروش معلق");
+        Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده" +
+            (total.ReturnedQuantity == 0 ? "" : $" · {Rules.Money(total.ReturnedQuantity)} واحد برگشتی") +
+            (total.PendingSalesCount == 0 ? "" : $" · {total.PendingSalesCount} فروش معلق");
     }
     static string Outcome(decimal net) => net < 0 ? "زیان" : net > 0 ? "سود" : "سر‌به‌سر";
 
@@ -262,7 +267,9 @@ public partial class MainWindow : Window
         var visible = saleRows.Where(x => (brand == "همه برندها" || x.Brand.Equals(brand, StringComparison.OrdinalIgnoreCase)) && (needle.Length == 0 || x.Code.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Name.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Customer.Contains(needle, StringComparison.OrdinalIgnoreCase) || x.Brand.Contains(needle, StringComparison.OrdinalIgnoreCase))).ToList();
         var calculated = visible.Where(x => x.Settlement != null).ToList();
         var pending = visible.Count - calculated.Count;
-        SalesGrid.ItemsSource = visible; SaleSummary.Text = $"{visible.Count} از {saleRows.Count} فروش · فروش واقعی: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Sales))} ریال · سود: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Profit))} ریال" + (pending == 0 ? "" : $" · {pending} فروش معلق");
+        SalesGrid.ItemsSource = visible; SaleSummary.Text = $"{visible.Count} از {saleRows.Count} فروش · فروش واقعی: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Sales))} ریال · سود: {Rules.ReportMoney(calculated.Sum(x => x.Settlement!.Profit))} ریال" +
+            (calculated.Sum(x => x.Settlement!.ReturnedQuantity) == 0 ? "" : $" · {Rules.Money(calculated.Sum(x => x.Settlement!.ReturnedQuantity))} واحد برگشتی") +
+            (pending == 0 ? "" : $" · {pending} فروش معلق");
     }
     void ImportSales(object s, RoutedEventArgs e)
     {
@@ -287,7 +294,33 @@ public partial class MainWindow : Window
                 sales.Add(rate is null ? rawSale : BrandMonthRules.Apply(rawSale, rate, month));
             }
             var pending = sales.Count(x => !Rules.HasRateSnapshot(x));
-            SaveLedger(ledger with { Items = items, Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. known.Select(x => x.ImportKey)] }, $"{sales.Count} فروش از اکسل وارد شد." + (pending == 0 ? "" : $" {pending} ردیف تا تعیین برند یا تأیید ماه، معلق است."));
+            SaveLedger(ledger with { Items = items, Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. known.Select(x => x.ImportKey)] }, $"{sales.Count} فروش از اکسل وارد شد." + (review.Ignored == 0 ? "" : $" {review.Ignored} ردیف آفر با قیمت واحد ۱ نادیده گرفته شد.") + (pending == 0 ? "" : $" {pending} ردیف تا تعیین برند یا تأیید ماه، معلق است."));
+        });
+    }
+
+    void ImportReturns(object s, RoutedEventArgs e)
+    {
+        var file = new OpenFileDialog { Filter = "فایل اکسل|*.xls;*.xlsx", Title = "ورود برگشت از فروش از اکسل" };
+        if (file.ShowDialog(this) != true) return;
+        Guard(() =>
+        {
+            var review = TransactionImport.Review(file.FileName);
+            if (review.Issues.Count > 0) throw new InvalidDataException($"{review.Issues.Count} ردیف اکسل نامعتبر است. نمونه: ردیف {review.Issues[0].Row} — {review.Issues[0].Message}");
+            var known = review.Rows.Where(x => !ledger.ImportedReturnRows.Contains(x.ImportKey)).ToList();
+            if (known.Count == 0) throw new InvalidDataException("هیچ ردیف جدیدی برای برگشت از فروش پیدا نشد.");
+            var returns = known.Select(row => new SaleReturn
+            {
+                Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity,
+                UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey
+            }).ToList();
+            var staged = ledger with { Returns = [.. ledger.Returns, .. returns], ImportedReturnRows = [.. ledger.ImportedReturnRows, .. known.Select(x => x.ImportKey)] };
+            var matching = SalesReturnMatcher.Match(staged.Sales, staged.Returns);
+            var affectedMonths = matching.Allocations.Where(x => returns.Any(r => r.Id == x.ReturnId))
+                .Select(x => staged.Sales.First(s => s.Id == x.SaleId)).Select(x => Rules.MonthOf(x.Date)).Distinct(StringComparer.Ordinal).ToList();
+            if (affectedMonths.Any(x => !CanEdit(x))) return;
+            var matchedReturns = returns.Count(x => matching.Allocations.Any(a => a.ReturnId == x.Id));
+            var pendingReturns = returns.Count - matchedReturns;
+            SaveLedger(staged, $"{returns.Count} برگشت از اکسل وارد شد؛ {matchedReturns} مورد اعمال شد." + (review.Ignored == 0 ? "" : $" {review.Ignored} ردیف آفر با قیمت واحد ۱ نادیده گرفته شد.") + (pendingReturns == 0 ? "" : $" {pendingReturns} مورد تطبیق کافی ندارد و معلق است."));
         });
     }
 
@@ -414,12 +447,14 @@ public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement? set
     public Sale Value => sale; public SaleSettlement? Settlement => settlement;
     public string Date => sale.Date; public string Customer => sale.Customer; public string Code => sale.Code; public string Brand => string.IsNullOrWhiteSpace(item.Brand) ? "تعیین‌نشده" : item.Brand; public string Name => item.Name;
     public string QuantityText => Rules.Money(sale.Quantity);
-    public string InvoiceNetText => Rules.ReportMoney(Rules.NetSaleBase(sale));
-    public string CashDiscountText => settlement == null ? "—" : Rules.ReportMoney(Rules.CashDiscountAmount(sale));
+    public string ReturnedQuantityText => settlement == null ? "—" : Rules.Money(settlement.ReturnedQuantity);
+    public string NetQuantityText => settlement == null ? "—" : Rules.Money(sale.Quantity - settlement.ReturnedQuantity);
+    public string InvoiceNetText => settlement == null ? Rules.ReportMoney(Rules.NetSaleBase(sale)) : Rules.ReportMoney(settlement.InvoiceBase);
+    public string CashDiscountText => settlement == null ? "—" : Rules.ReportMoney(Rules.CashDiscountAmount(sale, settlement.InvoiceBase));
     public string SalesText => settlement == null ? "—" : Rules.ReportMoney(settlement.Sales);
     public string CostText => settlement == null ? "—" : Rules.ReportMoney(settlement.Cost);
     public string ProfitText => settlement == null ? "—" : Rules.ReportMoney(settlement.Profit);
-    public string Status => settlement == null ? "در انتظار تعیین برند یا تأیید ماه" : settlement.HasManualCost ? "هزینه دستی" : "محاسبه‌شده";
+    public string Status => settlement == null ? "در انتظار تعیین برند یا تأیید ماه" : settlement.ReturnCount > 0 ? $"{settlement.ReturnCount} برگشت اعمال‌شده" : settlement.HasManualCost ? "هزینه دستی" : "محاسبه‌شده";
 }
 public sealed class UnknownCodeRow(CatalogItem item, int pendingCount, decimal pendingSales)
 {
@@ -437,5 +472,5 @@ public sealed class BrandRow(string brand, int count, decimal sales, decimal pro
 }
 public sealed class HistoryRow(Month month, LedgerTotal total)
 {
-    public string Key => month.Key; public string CostText => Rules.ReportMoney(total.Cost); public string SalesText => Rules.ReportMoney(total.Sales); public string ProfitText => Rules.ReportMoney(total.Profit); public string FixedText => Rules.ReportMoney(total.FixedCost); public string NetText => Rules.ReportMoney(total.Net); public string OutcomeText => total.Net < 0 ? "زیان" : total.Net > 0 ? "سود" : "سر‌به‌سر";
+    public string Key => month.Key; public string CostText => Rules.ReportMoney(total.Cost); public string ReturnedText => Rules.Money(total.ReturnedQuantity); public string SalesText => Rules.ReportMoney(total.Sales); public string ProfitText => Rules.ReportMoney(total.Profit); public string FixedText => Rules.ReportMoney(total.FixedCost); public string NetText => Rules.ReportMoney(total.Net); public string OutcomeText => total.Net < 0 ? "زیان" : total.Net > 0 ? "سود" : "سر‌به‌سر";
 }

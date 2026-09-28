@@ -248,6 +248,22 @@ public sealed record Sale
     public string ImportKey { get; init; } = "";
 }
 
+// برگشت فروش جدا از فروش اصلی نگه‌داری می‌شود. اثر آن در زمان محاسبه و فقط
+// روی فروش‌های قابل تطبیق اعمال می‌شود؛ بنابراین با اصلاح هر فروش، تطبیق‌ها
+// نیز بدون نگه‌داری وضعیتِ ناسازگار دوباره ساخته می‌شوند.
+public sealed record SaleReturn
+{
+    public string Id { get; init; } = Guid.NewGuid().ToString("N");
+    public string Date { get; init; } = "";
+    public string Code { get; init; } = "";
+    public string Customer { get; init; } = "";
+    public decimal Quantity { get; init; }
+    public decimal UnitPrice { get; init; }
+    public decimal Total { get; init; }
+    public decimal Deductions { get; init; }
+    public string ImportKey { get; init; } = "";
+}
+
 public sealed record Ledger
 {
     public bool BrandRulesInitialized { get; init; }
@@ -255,13 +271,18 @@ public sealed record Ledger
     public List<BrandMonthSettings> BrandMonths { get; init; } = [];
     public List<CatalogItem> Items { get; init; } = [];
     public List<Sale> Sales { get; init; } = [];
+    public List<SaleReturn> Returns { get; init; } = [];
     public List<string> ImportedRows { get; init; } = [];
+    public List<string> ImportedReturnRows { get; init; } = [];
 }
 
 public sealed record SaleSettlement(decimal Cost, decimal Cash, decimal Credit, decimal GrossPurchaseUnit, decimal NetCostUnit, bool HasManualCost)
 {
     public decimal Sales => Cash + Credit;
     public decimal Profit => Sales - Cost;
+    public decimal InvoiceBase { get; init; }
+    public decimal ReturnedQuantity { get; init; }
+    public int ReturnCount { get; init; }
 }
 public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, decimal Profit, decimal FixedCost, decimal Quantity, int Products, int Brands)
 {
@@ -270,6 +291,9 @@ public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, dec
     public decimal CashDiscountAmount { get; init; }
     public int PendingSalesCount { get; init; }
     public decimal PendingInvoiceSales { get; init; }
+    public decimal ReturnedQuantity { get; init; }
+    public int AppliedReturnsCount { get; init; }
+    public int PendingReturnsCount { get; init; }
     public decimal Net => Profit - FixedCost;
     public decimal? Margin => Sales == 0 ? null : Profit / Sales;
 }
@@ -277,6 +301,7 @@ public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, dec
 public static class Rules
 {
     public static string Normalize(string value) => value.Trim().Normalize(NormalizationForm.FormKC).Replace('ي', 'ی').Replace('ك', 'ک');
+    public static string MatchText(string value) => string.Join(" ", Normalize(value).Split(' ', StringSplitOptions.RemoveEmptyEntries));
     public static string Digits(string s) { for (var i = 0; i < 10; i++) s = s.Replace((char)('۰' + i), (char)('0' + i)).Replace((char)('٠' + i), (char)('0' + i)); return s.Replace("٬", "").Replace(",", "").Replace('٫', '.').Trim(); }
     public static decimal Number(string s) => decimal.TryParse(Digits(s), NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var n) ? n : throw new FormatException("عدد نامعتبر است: " + s);
     public static string Money(decimal n) => n.ToString("#,##0.##", CultureInfo.InvariantCulture);
@@ -286,8 +311,13 @@ public static class Rules
     public static bool ValidDate(string value) => value.Length == 8 && value.All(char.IsDigit) && ValidMonth(value[..4] + "/" + value[4..6]) && int.TryParse(value[6..], out var day) && day is >= 1 and <= 31;
     public static string MonthOf(string date) { date = Digits(date); if (!ValidDate(date)) throw new InvalidDataException("تاریخ باید مانند 14050421 باشد."); return date[..4] + "/" + date[4..6]; }
     public static decimal NetSaleBase(Sale sale) => sale.Total - sale.Deductions;
-    public static decimal CashDiscountAmount(Sale sale) => NetSaleBase(sale) * sale.CashShare * sale.CashDiscount;
-    public static (decimal Cash, decimal Credit) SplitSale(Sale sale) => (NetSaleBase(sale) * sale.CashShare * (1 - sale.CashDiscount), NetSaleBase(sale) * sale.CreditShare);
+    public static decimal ReturnNetBase(SaleReturn saleReturn) => saleReturn.Total - saleReturn.Deductions;
+    public static decimal CashDiscountAmount(Sale sale, decimal? invoiceBase = null) => (invoiceBase ?? NetSaleBase(sale)) * sale.CashShare * sale.CashDiscount;
+    public static (decimal Cash, decimal Credit) SplitSale(Sale sale, decimal? invoiceBase = null)
+    {
+        var baseAmount = invoiceBase ?? NetSaleBase(sale);
+        return (baseAmount * sale.CashShare * (1 - sale.CashDiscount), baseAmount * sale.CreditShare);
+    }
     public static decimal GrossPurchaseUnitFromSale(Sale sale) => sale.UnitPrice / (1 + sale.Markup);
     public static decimal EstimatedNetCostUnit(Sale sale) => GrossPurchaseUnitFromSale(sale) * (1 - sale.PurchaseDiscount - sale.Offer);
     public static decimal EstimatedCost(Sale sale) => sale.EstimatedCostOverride ?? EstimatedNetCostUnit(sale) * sale.Quantity;
@@ -317,6 +347,11 @@ public static class Rules
         if (sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.EstimatedCostOverride < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
         if (sale.RateMonthKey != MonthOf(sale.Date)) throw new InvalidDataException("ماه Snapshot فروش با تاریخ آن سازگار نیست.");
         if (sale.EstimatedCostOverride.HasValue && string.IsNullOrWhiteSpace(sale.EstimatedCostOverrideNote)) throw new InvalidDataException("برای هزینهٔ دستی فروش، دلیل را وارد کنید.");
+    }
+    public static void Validate(SaleReturn saleReturn)
+    {
+        if (!ValidDate(saleReturn.Date) || string.IsNullOrWhiteSpace(saleReturn.Code) || saleReturn.Quantity <= 0 || saleReturn.UnitPrice <= 0 || saleReturn.Total <= 0 || saleReturn.Deductions < 0 || ReturnNetBase(saleReturn) < 0)
+            throw new InvalidDataException("اطلاعات برگشت از فروش نامعتبر است.");
     }
     public static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
 }

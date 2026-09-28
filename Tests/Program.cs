@@ -127,6 +127,47 @@ public static void Main()
     var discountedResult = LedgerCalculator.PreviewSale(discounted);
     Test.Equal(985_000m, discountedResult.Sales, "invoice deductions and cash discount are not double counted");
 
+    // برگشتِ دارای تطبیق قطعی، همان فروش را با فرمول مصوب دوباره محاسبه می‌کند.
+    var returnSale = sale with { Id = "return-sale", Quantity = 10, Total = 10_400_000m, Deductions = 1_040_000m };
+    var returnDocument = new SaleReturn { Id = "return-1", Date = "14050628", Code = item.Code, Customer = "مشتری", Quantity = 5, UnitPrice = 1_040_000m, Total = 5_200_000m, Deductions = 200_000m };
+    var returnedLedger = ledger with { Sales = [returnSale], Returns = [returnDocument] };
+    var returnedCalculation = LedgerCalculator.Calculate(returnedLedger);
+    var returnedSettlement = returnedCalculation.Sales[returnSale.Id];
+    Test.Equal(5m, returnedSettlement.ReturnedQuantity, "matched return quantity");
+    // (۵۲۰٬۰۰۰ + (۵٬۲۰۰٬۰۰۰ - ۲۰۰٬۰۰۰)) - ۵٬۲۰۰٬۰۰۰ = ۳۲۰٬۰۰۰؛ به‌علاوه بخشِ برنگشتهٔ فروش (۴٬۶۸۰٬۰۰۰).
+    Test.Equal(5_000_000m, returnedSettlement.InvoiceBase, "approved return formula recalculates sale");
+    Test.Equal(Rules.EstimatedCost(returnSale) / 2, returnedSettlement.Cost, "return reduces estimated cost by returned quantity");
+
+    // در تطبیق چندفروشی، تعداد دقیق و سپس نزدیک‌ترین تاریخ، اولویت دارند.
+    Sale Candidate(string id, string date, decimal quantity) => new() { Id = id, Date = date, Code = "700001", Customer = "مشتری", Quantity = quantity, UnitPrice = 500m, Total = quantity * 500m };
+    var candidateEarly = Candidate("candidate-early", "14050610", 5);
+    var candidateExact = Candidate("candidate-exact", "14050620", 10);
+    var candidateReturn = new SaleReturn { Id = "candidate-return", Date = "14050625", Code = "700001", Customer = "مشتری", Quantity = 10, UnitPrice = 500m, Total = 5_000m };
+    var candidateMatch = SalesReturnMatcher.Match([candidateEarly, candidateExact], [candidateReturn]);
+    Test.Equal("candidate-exact", candidateMatch.Allocations.Single().SaleId, "exact quantity has priority over older smaller sale");
+    var tieOld = Candidate("tie-old", "14050615", 4);
+    var tieNew = Candidate("tie-new", "14050622", 4);
+    var tieReturn = candidateReturn with { Id = "tie-return", Quantity = 4 };
+    var tieMatch = SalesReturnMatcher.Match([tieOld, tieNew], [tieReturn]);
+    Test.Equal("tie-new", tieMatch.Allocations.Single().SaleId, "closest prior sale resolves exact-quantity tie");
+    var tooLarge = candidateReturn with { Id = "too-large", Quantity = 16, Total = 8_000m };
+    var pendingMatch = SalesReturnMatcher.Match([candidateEarly, candidateExact], [tooLarge]);
+    Test.Equal(0, pendingMatch.Allocations.Count, "insufficient return receives no partial allocation");
+    Test.Equal(1, pendingMatch.PendingReturns.Count, "insufficient return remains pending");
+
+    // فقط قیمت واحد دقیقاً یک، آفر است؛ قیمت‌های پایین دیگر نباید حذف شوند.
+    var importFile = System.IO.Path.Combine(root, "offer-rows.xls");
+    File.WriteAllText(importFile, """
+<?xml version="1.0"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Sheet1"><Table>
+<Row><Cell><Data ss:Type="String">تاریخ</Data></Cell><Cell><Data ss:Type="String">نام حساب</Data></Cell><Cell><Data ss:Type="String">کد کالا</Data></Cell><Cell><Data ss:Type="String">نام کالا</Data></Cell><Cell><Data ss:Type="String">تعداد</Data></Cell><Cell><Data ss:Type="String">قیمت</Data></Cell><Cell><Data ss:Type="String">قیمت کل</Data></Cell></Row>
+<Row><Cell><Data ss:Type="String">14050627</Data></Cell><Cell><Data ss:Type="String">مشتری</Data></Cell><Cell><Data ss:Type="String">900001</Data></Cell><Cell><Data ss:Type="String">آفر</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell></Row>
+<Row><Cell><Data ss:Type="String">14050627</Data></Cell><Cell><Data ss:Type="String">مشتری</Data></Cell><Cell><Data ss:Type="String">900002</Data></Cell><Cell><Data ss:Type="String">فروش کم‌مبلغ</Data></Cell><Cell><Data ss:Type="Number">1</Data></Cell><Cell><Data ss:Type="Number">2</Data></Cell><Cell><Data ss:Type="Number">2</Data></Cell></Row>
+</Table></Worksheet></Workbook>
+""");
+    var offerReview = TransactionImport.Review(importFile);
+    Test.Equal(1, offerReview.Ignored, "only unit price one is ignored as offer");
+    Test.Equal(1, offerReview.Rows.Count, "unit price two remains importable");
+
     var unknownItem = new CatalogItem { Code = "999001", Name = "کالای بی‌برند" };
     var pendingSale = new Sale { Id = "sale-pending", Date = "14050702", Code = unknownItem.Code, Customer = "مشتری", Quantity = 2, UnitPrice = 500_000m, Total = 1_000_000m, Deductions = 0 };
     var pendingLedger = ledger with { Items = [.. ledger.Items, unknownItem], Sales = [pendingSale] };

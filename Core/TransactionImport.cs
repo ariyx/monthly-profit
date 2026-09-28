@@ -29,11 +29,11 @@ public static class TransactionImport
             {
                 string Value(string name) => cells.GetValueOrDefault(Header(name), "");
                 var unitText = Value("قیمت"); var totalText = Value("قیمت کل");
-                // آفر/تستر با قیمت یک یا دو رقمی و ردیف‌های بدون مبلغ، وارد گردش واقعی نمی‌شوند.
+                // فقط ردیف قیمت واحد دقیقاً یک، آفر است و در فروش یا برگشت وارد نمی‌شود.
                 if (string.IsNullOrWhiteSpace(unitText)) { ignored++; continue; }
                 var quantity = Rules.Number(string.IsNullOrWhiteSpace(Value("تعداد واحد اصلی")) ? Value("تعداد") : Value("تعداد واحد اصلی"));
                 var unit = Rules.Number(unitText); var total = string.IsNullOrWhiteSpace(totalText) ? quantity * unit : Rules.Number(totalText);
-                if (unit <= 99 || total <= 99) { ignored++; continue; }
+                if (unit == 1) { ignored++; continue; }
                 var date = Rules.Digits(Value("تاریخ")); var code = Rules.Normalize(Value("کد کالا")); var name = Rules.Normalize(Value("نام کالا"));
                 var account = Rules.Normalize(Value("نام حساب"));
                 var deductionsText = Value("کسورات"); var deductions = string.IsNullOrWhiteSpace(deductionsText) ? 0m : Rules.Number(deductionsText);
