@@ -46,7 +46,7 @@ public sealed class BrandEditorDialog : Window
         {
             TextBox PercentField(string label, decimal amount) { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, amount); body.Children.Add(input); return input; }
             purchaseDiscount = PercentField("تخفیف خرید ٪", monthlyRate.PurchaseDiscount);
-            offer = PercentField("آفر ٪", monthlyRate.Offer);
+            offer = PercentField("آفر خرید ٪", monthlyRate.Offer);
             markup = PercentField("مارک‌آپ ٪", monthlyRate.Markup);
             cashShare = PercentField("سهم نقدی ٪", monthlyRate.CashShare);
             creditShare = PercentField("سهم چکی ٪", monthlyRate.CreditShare);
@@ -93,7 +93,7 @@ public sealed class BrandAssignmentDialog : Window
             rates.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, value); rates.Children.Add(input); return input;
         }
         var purchaseDiscount = PercentField("تخفیف خرید ٪", 0);
-        var offer = PercentField("آفر ٪", 0);
+        var offer = PercentField("آفر خرید ٪", 0);
         var markup = PercentField("مارک‌آپ ٪", .04m);
         var cashShare = PercentField("سهم نقدی ٪", .30m);
         var creditShare = PercentField("سهم چکی ٪", .70m);
