@@ -47,7 +47,7 @@ public sealed class BrandEditorDialog : Window
             TextBox PercentField(string label, decimal amount) { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, amount); body.Children.Add(input); return input; }
             purchaseDiscount = PercentField("تخفیف خرید ٪", monthlyRate.PurchaseDiscount);
             offer = PercentField("آفر ٪", monthlyRate.Offer);
-            markup = PercentField("مارک‌آپ ٪", monthlyRate.Markup);
+            markup = PercentField("مارک‌آپ پایه از روز اول ماه ٪ (تغییر وسط ماه در «بازه‌های مارک‌آپ»)", monthlyRate.Markup);
             cashShare = PercentField("سهم نقدی ٪", monthlyRate.CashShare);
             creditShare = PercentField("سهم چکی ٪", monthlyRate.CreditShare);
             cashDiscount = PercentField("تخفیف نقدی ٪", monthlyRate.CashDiscount);
@@ -168,12 +168,13 @@ public sealed class SaleDialog : Window
         var cleanDate = Rules.Digits(date.Text); var cleanCode = Rules.Normalize(code.Text); var cleanName = Rules.Normalize(name.Text);
         if (!Rules.ValidDate(cleanDate) || string.IsNullOrWhiteSpace(cleanCode) || string.IsNullOrWhiteSpace(cleanName)) throw new InvalidDataException("تاریخ، کد و نام کالا الزامی هستند.");
         var found = ledger.Items.FirstOrDefault(x => x.Code.Equals(cleanCode, StringComparison.OrdinalIgnoreCase));
-        var brand = found?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, cleanCode)?.Name ?? "";
+        var brand = found?.Brand ?? BrandPrefixRules.DetectActive(ledger.Brands, cleanCode)?.Name ?? "";
+        if (!string.IsNullOrWhiteSpace(brand)) BrandLifecycle.RequireActive(ledger, brand);
         item = found ?? new CatalogItem { Code = cleanCode, Name = cleanName, Brand = brand };
         var qty = Rules.Number(quantity.Text); var unit = Rules.Number(price.Text); var total = qty * unit;
         var sale = new Sale { Date = cleanDate, Code = cleanCode, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = total, Deductions = Rules.Number(deductions.Text) };
         var month = Rules.MonthOf(cleanDate); var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, month);
-        if (rate is not null) sale = BrandMonthRules.Apply(sale, rate, month);
+        if (rate is not null) sale = BrandMonthRules.Apply(sale, rate, month, ledger);
         Rules.Validate(sale); return sale;
     }
     static string Preview(Sale sale)
@@ -186,6 +187,9 @@ public sealed class SaleDialog : Window
 
 public sealed class SaleEditorDialog : Window
 {
+    readonly CheckBox customMarkup;
+    readonly TextBox markupValue;
+    readonly TextBox markupReason;
     readonly Ledger ledger; readonly Sale original; readonly TextBox date; readonly TextBox customer; readonly TextBox quantity; readonly TextBox price; readonly TextBox deductions; readonly CheckBox manual; readonly TextBox manualCost; readonly TextBox manualReason; readonly TextBlock preview;
     public Sale? Value { get; private set; }
     public SaleEditorDialog(Ledger ledger, Sale sale)
@@ -199,14 +203,17 @@ public sealed class SaleEditorDialog : Window
         TextBox Field(string label, string value) { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(value); body.Children.Add(input); return input; }
         date = Field("تاریخ", sale.Date); customer = Field("مشتری", sale.Customer); quantity = Field("تعداد", Rules.Money(sale.Quantity)); price = Field("قیمت فروش واحد — ریال", Rules.Money(sale.UnitPrice)); deductions = Field("کسورات فاکتور — ریال", Rules.Money(sale.Deductions));
         MoneyInput.Attach(quantity); MoneyInput.Attach(price); MoneyInput.Attach(deductions);
+        customMarkup = new CheckBox { Content = "مارک‌آپ مخصوص همین فروش", IsChecked = sale.MarkupOverride.HasValue, FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 5, 0, 8) }; body.Children.Add(customMarkup);
+        markupValue = Field("مارک‌آپ مخصوص فروش ٪", ((sale.MarkupOverride ?? sale.Markup) * 100m).ToString("0.##", CultureInfo.InvariantCulture));
+        markupReason = Field("دلیل مارک‌آپ مخصوص فروش", sale.MarkupOverrideReason);
         manual = new CheckBox { Content = "هزینه تخمینی این فروش را دستی ثبت می‌کنم.", IsChecked = sale.EstimatedCostOverride.HasValue, FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 5, 0, 8) }; body.Children.Add(manual);
         manualCost = Field("هزینه کل دستی — ریال", sale.EstimatedCostOverride.HasValue ? Rules.Money(sale.EstimatedCostOverride.Value) : ""); manualReason = Field("دلیل هزینه دستی", sale.EstimatedCostOverrideNote); MoneyInput.Attach(manualCost);
         preview = new TextBlock { Background = new SolidColorBrush(Color.FromRgb(248, 250, 252)), Padding = new Thickness(14), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 8, 0, 8) }; body.Children.Add(preview);
         var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left }; body.Children.Add(error);
         var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(20, 0, 20, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var save = new Button { Content = "ثبت تغییرات", Style = (Style)FindResource("Primary"), IsDefault = true }; footer.Children.Add(save); footer.Children.Add(new Button { Content = "انصراف", IsCancel = true });
-        void Refresh() { manualCost.IsEnabled = manualReason.IsEnabled = manual.IsChecked == true; try { preview.Text = Preview(Read()); error.Text = ""; } catch (Exception ex) { preview.Text = ""; error.Text = ex.Message; } }
-        foreach (var input in new[] { date, customer, quantity, price, deductions, manualCost, manualReason }) input.TextChanged += (_, _) => Refresh(); manual.Checked += (_, _) => Refresh(); manual.Unchecked += (_, _) => Refresh();
+        void Refresh() { markupValue.IsEnabled = markupReason.IsEnabled = customMarkup.IsChecked == true; manualCost.IsEnabled = manualReason.IsEnabled = manual.IsChecked == true; try { preview.Text = Preview(Read()); error.Text = ""; } catch (Exception ex) { preview.Text = ""; error.Text = ex.Message; } }
+        foreach (var input in new[] { date, customer, quantity, price, deductions, manualCost, manualReason, markupValue, markupReason }) input.TextChanged += (_, _) => Refresh(); manual.Checked += (_, _) => Refresh(); manual.Unchecked += (_, _) => Refresh(); customMarkup.Checked += (_, _) => Refresh(); customMarkup.Unchecked += (_, _) => Refresh();
         save.Click += (_, _) => { try { Value = Read(); DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } }; Refresh();
     }
     Sale Read()
@@ -217,7 +224,8 @@ public sealed class SaleEditorDialog : Window
         decimal? overrideCost = manual.IsChecked == true ? Rules.Number(manualCost.Text) : null;
         var raw = original with { Date = cleanDate, Customer = Rules.Normalize(customer.Text), Quantity = qty, UnitPrice = unit, Total = qty * unit, Deductions = Rules.Number(deductions.Text), EstimatedCostOverride = overrideCost, EstimatedCostOverrideNote = manual.IsChecked == true ? Rules.Normalize(manualReason.Text) : "", RateMonthKey = "", CashShare = 0, CreditShare = 0, CashDiscount = 0, PurchaseDiscount = 0, Offer = 0, Markup = 0 };
         var rate = string.IsNullOrWhiteSpace(item.Brand) ? null : BrandMonthRules.TryConfirmed(ledger, item.Brand, month);
-        var next = rate is null ? raw : BrandMonthRules.Apply(raw, rate, month);
+        raw = raw with { MarkupOverride = customMarkup.IsChecked == true ? DialogUi.Percent(markupValue) : (decimal?)null, MarkupOverrideReason = customMarkup.IsChecked == true ? Rules.Normalize(markupReason.Text) : "" };
+        var next = rate is null ? raw : BrandMonthRules.Apply(raw, rate, month, ledger);
         Rules.Validate(next); return next;
     }
     string Preview(Sale sale)
@@ -225,7 +233,7 @@ public sealed class SaleEditorDialog : Window
         if (!Rules.HasRateSnapshot(sale)) return "این فروش تا تعیین برند و تأیید درصدهای ماه، در محاسبه سود وارد نمی‌شود.";
         var staged = ledger with { Sales = ledger.Sales.Select(x => x.Id == sale.Id ? sale : x).ToList() };
         var value = LedgerCalculator.Calculate(staged).Sales[sale.Id];
-        return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی پس از برگشت و آفر: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال";
+        return $"مارک‌آپ این فروش: {Rules.Percent(sale.Markup)} ({(sale.MarkupOverride.HasValue ? "اختصاصی" : "بر اساس تاریخ")})\nقیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی پس از برگشت و آفر: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال";
     }
 }
 

@@ -90,9 +90,12 @@ public partial class MainWindow : Window
     bool EnsureBrandMonthConfirmed(string monthKey)
     {
         if (BrandMonthRules.IsConfirmed(ledger, monthKey)) return true;
+        if (!CanEdit(monthKey)) return false;
         var dialog = new BrandMonthConfirmationDialog(BrandMonthRules.DraftFor(ledger, monthKey)) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null) { Status.Text = $"تنظیمات برندهای ماه {monthKey} تأیید نشده است."; return false; }
-        ledger = BrandMonthRules.Confirm(ledger, monthKey, dialog.Value); store.SaveLedger(ledger);
+        var next = BrandMonthRules.Confirm(ledger, monthKey, dialog.Value);
+        if (!ConfirmRateChange(next) || !CanSaveFinancialChange(next)) return false;
+        ledger = next; store.SaveLedger(ledger);
         Status.Text = $"تنظیمات برندهای ماه {monthKey} تأیید شد."; return true;
     }
     bool EnsureBrandMonthsConfirmed(IEnumerable<string> keys)
@@ -124,6 +127,7 @@ public partial class MainWindow : Window
     {
         if (month != null && !CanEdit(month)) throw new InvalidOperationException($"ماه {month} بسته است.");
         next = BrandMonthRules.ApplyExactProductCodeAssignments(next);
+        if (!CanSaveFinancialChange(next)) return;
         store.SaveLedger(next); Reload(); Status.Text = action;
     }
     void SaveMonth(Month next, string action)
@@ -194,9 +198,10 @@ public partial class MainWindow : Window
             var brands = ledger.Brands.Select(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(old.Name), StringComparison.OrdinalIgnoreCase) ? next : x).ToList();
             BrandPrefixRules.ValidateUnique(brands);
             var settings = ledger.BrandMonths.Select(setting => setting with { Rates = setting.Rates.Select(rate => Rules.Normalize(rate.BrandName).Equals(Rules.Normalize(old.Name), StringComparison.OrdinalIgnoreCase) ? rate with { BrandName = next.Name } : rate).ToList() }).ToList();
-            var renamed = ledger with { Brands = brands, BrandMonths = settings };
+            var renamed = ledger with { Brands = brands, BrandMonths = settings, MarkupPeriods = ledger.MarkupPeriods.Select(p => MarkupRules.SameBrand(p.BrandName, old.Name) ? p with { BrandName = next.Name } : p).ToList() };
             var rates = BrandMonthRules.DraftFor(renamed, current.Key).Rates.Select(rate => Rules.Normalize(rate.BrandName).Equals(Rules.Normalize(next.Name), StringComparison.OrdinalIgnoreCase) ? editedRate with { BrandName = next.Name } : rate).ToList();
-            SaveLedger(BrandMonthRules.Confirm(renamed, current.Key, rates), $"برند «{next.Name}» و درصدهای ماه {current.Key} ویرایش شد؛ فروش‌های همان برند دوباره محاسبه شدند.");
+            var staged = BrandMonthRules.Confirm(renamed, current.Key, rates);
+            if (ConfirmRateChange(staged) && CanSaveFinancialChange(staged)) SaveLedger(staged, $"برند «{next.Name}» و درصدهای ماه {current.Key} ویرایش شد؛ بازه‌های مارک‌آپ و استثناهای فروش حفظ شدند.");
         });
     }
     void ConfirmBrandMonth(object s, RoutedEventArgs e)
@@ -204,7 +209,71 @@ public partial class MainWindow : Window
         if (!CanEdit()) return;
         var dialog = new BrandMonthConfirmationDialog(BrandMonthRules.DraftFor(ledger, current.Key)) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null) return;
-        Guard(() => { ledger = BrandMonthRules.Confirm(ledger, current.Key, dialog.Value); store.SaveLedger(ledger); Draw(); Status.Text = $"تنظیمات ماه {current.Key} تأیید شد."; });
+        Guard(() => { var next = BrandMonthRules.Confirm(ledger, current.Key, dialog.Value); if (ConfirmRateChange(next) && CanSaveFinancialChange(next)) SaveLedger(next, $"تنظیمات ماه {current.Key} تأیید شد."); });
+    }
+
+    bool ConfirmRateChange(Ledger next)
+    {
+        var old = ledger.Sales.ToDictionary(x => x.Id);
+        var changed = next.Sales.Where(s => old.TryGetValue(s.Id, out var before) && (before.Markup != s.Markup || before.RateMonthKey != s.RateMonthKey || before.PurchaseDiscount != s.PurchaseDiscount || before.Offer != s.Offer || before.CashShare != s.CashShare || before.CreditShare != s.CreditShare || before.CashDiscount != s.CashDiscount)).OrderBy(s => s.Date).ToList();
+        var periods = next.MarkupPeriods.Where(p => !ledger.MarkupPeriods.Contains(p)).Select(p =>
+        {
+            var following = next.MarkupPeriods.Where(q => MarkupRules.SameBrand(q.BrandName, p.BrandName) && Rules.MonthOf(q.StartDate) == Rules.MonthOf(p.StartDate) && string.CompareOrdinal(q.StartDate, p.StartDate) > 0).OrderBy(q => q.StartDate).FirstOrDefault();
+            var end = following is null ? "پایان ماه" : following.StartDate[..6] + (int.Parse(following.StartDate[6..]) - 1).ToString("00");
+            return $"بازه: {p.StartDate} تا {end} · {p.BrandName} · {Rules.Percent(p.Markup)}";
+        });
+        var detail = changed.GroupBy(s => (s.Date, Brand: next.Items.First(x => x.Code.Equals(s.Code, StringComparison.OrdinalIgnoreCase)).Brand))
+            .Select(g => $"{g.Key.Date} · {g.Key.Brand}: {g.Count()} فروش");
+        var baselineChanges = new List<string>();
+        foreach (var setting in next.BrandMonths)
+        {
+            var previous = ledger.BrandMonths.FirstOrDefault(m => m.MonthKey == setting.MonthKey);
+            foreach (var rate in setting.Rates)
+            {
+                var oldRate = previous?.Rates.FirstOrDefault(r => MarkupRules.SameBrand(r.BrandName, rate.BrandName));
+                if (oldRate is not null && oldRate.Markup == rate.Markup) continue;
+                var following = next.MarkupPeriods.Where(p => MarkupRules.SameBrand(p.BrandName, rate.BrandName) && Rules.MonthOf(p.StartDate) == setting.MonthKey).OrderBy(p => p.StartDate).FirstOrDefault();
+                var end = following is null ? "پایان ماه" : following.StartDate[..6] + (int.Parse(following.StartDate[6..]) - 1).ToString("00");
+                baselineChanges.Add($"پایه: {setting.MonthKey.Replace("/", "")}01 تا {end} · {rate.BrandName} · {Rules.Percent(rate.Markup)}");
+            }
+        }
+        var message = string.Join("\n", baselineChanges.Concat(periods)) + $"\n{changed.Count} فروش دوباره محاسبه می‌شود. مارک‌آپ اختصاصی فروش‌ها حفظ می‌شود.";
+        if (changed.Count > 0) message += "\n" + string.Join("\n", detail);
+        var dialog = new ImportReviewDialog([message], "قبل از ثبت، فروش‌های تحت‌تأثیر را بررسی کنید. بازه‌های دیگر مارک‌آپ و مارک‌آپ اختصاصی فروش حفظ می‌شوند.", "تأیید و محاسبه مجدد") { Owner = this, Title = "تأیید تغییر درصدها" };
+        return dialog.ShowDialog() == true;
+    }
+
+    void EditMarkupPeriods(object sender, RoutedEventArgs e)
+    {
+        if (BrandSettingsGrid.SelectedItem is not BrandSettingsRow row) { MessageBox.Show(this, "ابتدا برند را از جدول انتخاب کنید."); return; }
+        if (!CanEdit()) return;
+        Guard(() =>
+        {
+            BrandLifecycle.RequireActive(ledger, row.Brand.Name);
+            var dialog = new MarkupScheduleDialog(ledger, row.Brand, current.Key) { Owner = this };
+            if (dialog.ShowDialog() == true && dialog.Value is not null && ConfirmRateChange(dialog.Value) && CanSaveFinancialChange(dialog.Value)) SaveLedger(dialog.Value, dialog.ActionText);
+        });
+    }
+
+    void DeleteBrand(object sender, RoutedEventArgs e)
+    {
+        if (BrandSettingsGrid.SelectedItem is not BrandSettingsRow row) { MessageBox.Show(this, "ابتدا برند را از جدول انتخاب کنید."); return; }
+        Guard(() =>
+        {
+            var used = BrandLifecycle.RelatedTransactions(ledger, row.Brand.Name);
+            var items = ledger.Items.Count(i => MarkupRules.SameBrand(i.Brand, row.Brand.Name));
+            var action = used > 0 ? "غیرفعال‌سازی" : "حذف";
+            var message = $"{action} برند «{row.Brand.Name}»؟\n{items} کالا و {used} ردیف فروش، برگشت یا آفر مرتبط دارد.\n" + (used > 0 ? "گزارش‌ها و محاسبات قبلی حفظ می‌شوند؛ برند برای ثبت جدید قابل انتخاب نیست." : "کالاهای آن در صورت وجود، بدون برند باقی می‌مانند.");
+            if (MessageBox.Show(this, message, action + " برند", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            var next = BrandLifecycle.RemoveOrDeactivate(ledger, row.Brand.Name);
+            if (CanSaveFinancialChange(next)) SaveLedger(next, $"{action} برند «{row.Brand.Name}» انجام شد.");
+        });
+    }
+
+    void ReactivateBrand(object sender, RoutedEventArgs e)
+    {
+        if (BrandSettingsGrid.SelectedItem is not BrandSettingsRow row || row.Brand.IsActive) return;
+        Guard(() => SaveLedger(ledger with { Brands = ledger.Brands.Select(b => b == row.Brand ? b with { IsActive = true } : b).ToList() }, $"برند «{row.Brand.Name}» فعال شد."));
     }
 
     void AddSale(object s, RoutedEventArgs e)
@@ -330,7 +399,8 @@ public partial class MainWindow : Window
                 else
                 {
                     var item = items.FirstOrDefault(x => x.Code.Equals(row.Code, StringComparison.OrdinalIgnoreCase));
-                    var brand = item?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, row.Code)?.Name ?? "";
+                    var brand = item?.Brand ?? BrandPrefixRules.DetectActive(ledger.Brands, row.Code)?.Name ?? "";
+                    if (sales.All(x => x.Id != id) && !string.IsNullOrWhiteSpace(brand)) BrandLifecycle.RequireActive(ledger, brand);
                     if (item is null) { item = new CatalogItem { Code = row.Code, Name = row.Name, Brand = brand }; items.Add(item); }
                     var prior = sales.FirstOrDefault(x => x.Id == id) ?? new Sale { Id = id };
                     var value = prior with { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint, ImportKey = row.ImportKey };
@@ -338,7 +408,7 @@ public partial class MainWindow : Window
                     else
                     {
                         var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, Rules.MonthOf(row.Date));
-                        if (rate is not null) value = BrandMonthRules.Apply(value, rate, Rules.MonthOf(row.Date));
+                        if (rate is not null) value = BrandMonthRules.Apply(value, rate, Rules.MonthOf(row.Date), ledger);
                     }
                     sales.RemoveAll(x => x.Id == id); sales.Add(value);
                 }
@@ -358,13 +428,16 @@ public partial class MainWindow : Window
 
     bool CanSaveFinancialChange(Ledger staged)
     {
+        var closed = store.Keys().Select(key => store.Load(key)).Where(month => month.IsClosed).ToList();
+        if (closed.Count == 0) return true;
+        var before = LedgerCalculator.Calculate(ledger);
         var next = LedgerCalculator.Calculate(staged);
-        foreach (var key in store.Keys().Where(x => store.Load(x).IsClosed))
+        foreach (var month in closed)
         {
-            var month = store.Load(key);
-            if (LedgerCalculator.SummarizeMonth(ledger, month, calculation) != LedgerCalculator.SummarizeMonth(staged, month, next)) return CanEdit(key);
+            var key = month.Key;
+            if (LedgerCalculator.SummarizeMonth(ledger, month, before) != LedgerCalculator.SummarizeMonth(staged, month, next)) return CanEdit(key);
             var ids = ledger.Sales.Concat(staged.Sales).Where(x => Rules.MonthOf(x.Date) == key).Select(x => x.Id).Distinct();
-            if (ids.Any(id => calculation.Sales.GetValueOrDefault(id) != next.Sales.GetValueOrDefault(id))) return CanEdit(key);
+            if (ids.Any(id => before.Sales.GetValueOrDefault(id) != next.Sales.GetValueOrDefault(id))) return CanEdit(key);
         }
         return true;
     }
@@ -421,11 +494,12 @@ public partial class MainWindow : Window
     void PendingBrandsGrid_MouseDoubleClick(object s, MouseButtonEventArgs e)
     {
         if (PendingBrandsGrid.SelectedItem is not UnknownCodeRow row || !CanEdit()) return;
-        var dialog = new BrandAssignmentDialog(row.Item, ledger.Brands) { Owner = this };
+        var dialog = new BrandAssignmentDialog(row.Item, ledger.Brands.Where(b => b.IsActive)) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.Value == null) return;
         Guard(() =>
         {
             var brand = dialog.Value;
+            if (ledger.Brands.Any(b => !b.IsActive && MarkupRules.SameBrand(b.Name, brand.Name))) throw new InvalidOperationException("این برند غیرفعال است؛ ابتدا آن را از بخش برندها فعال کنید.");
             var brands = ledger.Brands.Any(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase))
                 ? ledger.Brands.Select(x => Rules.Normalize(x.Name).Equals(Rules.Normalize(brand.Name), StringComparison.OrdinalIgnoreCase) ? brand : x).ToList()
                 : ledger.Brands.Append(brand).ToList();
@@ -623,6 +697,7 @@ public sealed class UnknownCodeRow(CatalogItem item, int pendingCount, decimal p
 public sealed class BrandSettingsRow(Brand brand, BrandRate rate)
 {
     public Brand Brand => brand; public BrandRate Rate => rate;
+    public string ActiveText => brand.IsActive ? "فعال" : "غیرفعال";
     public string Name => brand.Name; public string Prefixes => BrandPrefixRules.Display(brand.CodePrefixes); public string PurchaseDiscountText => Rules.Percent(rate.PurchaseDiscount); public string OfferText => Rules.Percent(rate.Offer); public string MarkupText => Rules.Percent(rate.Markup); public string CashShareText => Rules.Percent(rate.CashShare); public string CreditShareText => Rules.Percent(rate.CreditShare); public string CashDiscountText => Rules.Percent(rate.CashDiscount);
 }
 public sealed class BrandRow(string brand, int count, decimal sales, decimal profit)

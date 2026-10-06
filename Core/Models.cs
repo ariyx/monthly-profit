@@ -22,6 +22,7 @@ public sealed record Preferences { public bool AutoBackupOnExit { get; init; } p
 // هویت برند و مقادیر پایه برای اولین تنظیم ماهانه.
 public sealed record Brand
 {
+    public bool IsActive { get; init; } = true;
     public string Name { get; init; } = "";
     public List<string> CodePrefixes { get; init; } = [];
     public List<string> ExactProductCodes { get; init; } = [];
@@ -82,7 +83,9 @@ public static class BrandMonthRules
         }
         var source = ledger.BrandMonths.Where(x => x.IsConfirmed && string.CompareOrdinal(x.MonthKey, monthKey) < 0).OrderByDescending(x => x.MonthKey, StringComparer.Ordinal).FirstOrDefault();
         var previous = source?.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, BrandRate>(StringComparer.OrdinalIgnoreCase);
-        var draft = ledger.Brands.Select(b => previous.TryGetValue(Rules.Normalize(b.Name), out var rate) ? rate with { BrandName = b.Name } : FromBrand(b)).ToList();
+        var draft = ledger.Brands.Select(b => previous.TryGetValue(Rules.Normalize(b.Name), out var rate)
+            ? rate with { BrandName = b.Name, Markup = MarkupRules.Resolve(ledger, b.Name, source!.MonthKey.Replace("/", "") + "31", rate.Markup) }
+            : FromBrand(b)).ToList();
         return new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = source?.MonthKey ?? "تنظیمات پیش‌فرض", Rates = draft };
     }
 
@@ -120,7 +123,7 @@ public static class BrandMonthRules
             if (!items.TryGetValue(sale.Code, out var item)) throw new InvalidDataException($"کالای کد {sale.Code} یافت نشد.");
             // فروشِ کالای بی‌برند در دفتر باقی می‌ماند، اما تا زمان تعیین برند محاسبه نمی‌شود.
             if (string.IsNullOrWhiteSpace(item.Brand)) return sale;
-            return Apply(sale, RequireConfirmed(staged, item.Brand, monthKey), monthKey);
+            return Apply(sale, RequireConfirmed(staged, item.Brand, monthKey), monthKey, staged);
         }).ToList();
         return staged with { Sales = sales };
     }
@@ -136,14 +139,14 @@ public static class BrandMonthRules
             if (!sale.Code.Equals(code, StringComparison.OrdinalIgnoreCase) || HasSnapshot(sale)) return sale;
             var monthKey = Rules.MonthOf(sale.Date);
             var rate = TryConfirmed(ledger, item.Brand, monthKey);
-            return rate is null ? sale : Apply(sale, rate, monthKey);
+            return rate is null ? sale : Apply(sale, rate, monthKey, ledger);
         }).ToList();
         return ledger with { Sales = sales };
     }
 
     public static Ledger ApplyExactProductCodeAssignments(Ledger ledger)
     {
-        var exactBrands = ledger.Items.Select(item => (Item: item, Brand: BrandPrefixRules.DetectExact(ledger.Brands, item.Code)))
+        var exactBrands = ledger.Items.Select(item => (Item: item, Brand: BrandPrefixRules.DetectExact(ledger.Brands.Where(b => b.IsActive), item.Code)))
             .Where(x => x.Brand is not null && !Rules.Normalize(x.Item.Brand).Equals(Rules.Normalize(x.Brand!.Name), StringComparison.OrdinalIgnoreCase))
             .ToDictionary(x => x.Item.Code, x => x.Brand!.Name, StringComparer.OrdinalIgnoreCase);
         if (exactBrands.Count == 0) return ledger;
@@ -158,17 +161,18 @@ public static class BrandMonthRules
             {
                 CashShare = 0, CreditShare = 0, CashDiscount = 0, PurchaseDiscount = 0, Offer = 0, Markup = 0, RateMonthKey = "",
                 EstimatedCostOverride = null, EstimatedCostOverrideNote = ""
-            } : Apply(sale, rate, monthKey);
+            } : Apply(sale, rate, monthKey, staged);
         }).ToList();
         return staged with { Sales = sales };
     }
 
     static bool HasSnapshot(Sale sale) => Rules.HasRateSnapshot(sale);
 
-    public static Sale Apply(Sale sale, BrandRate rate, string monthKey) => sale with
+    public static Sale Apply(Sale sale, BrandRate rate, string monthKey, Ledger? ledger = null) => sale with
     {
         CashShare = rate.CashShare, CreditShare = rate.CreditShare, CashDiscount = rate.CashDiscount,
-        PurchaseDiscount = rate.PurchaseDiscount, Offer = rate.Offer, Markup = rate.Markup, RateMonthKey = monthKey
+        PurchaseDiscount = rate.PurchaseDiscount, Offer = rate.Offer,
+        Markup = sale.MarkupOverride ?? (ledger is null ? rate.Markup : MarkupRules.Resolve(ledger, rate.BrandName, sale.Date, rate.Markup)), RateMonthKey = monthKey
     };
 }
 
@@ -203,6 +207,11 @@ public static class BrandPrefixRules
         var normalizedCode = Rules.Digits(code);
         return brands.FirstOrDefault(b => b.ExactProductCodes.Any(x => Rules.Digits(x).Equals(normalizedCode, StringComparison.Ordinal)));
     }
+    public static Brand? DetectActive(IEnumerable<Brand> brands, string code)
+    {
+        var brand = Detect(brands, code);
+        return brand?.IsActive == true ? brand : null;
+    }
     public static void ValidateUnique(IEnumerable<Brand> brands)
     {
         var duplicate = brands.SelectMany(b => b.CodePrefixes.Select(p => (Prefix: Rules.Digits(p), Brand: Rules.Normalize(b.Name)))).Where(x => x.Prefix.Length > 0).GroupBy(x => x.Prefix).FirstOrDefault(x => x.Select(y => y.Brand).Distinct().Count() > 1);
@@ -228,6 +237,8 @@ public static class BrandPrefixRules
 public sealed record CatalogItem { public string Code { get; init; } = ""; public string Name { get; init; } = ""; public string Brand { get; init; } = ""; }
 public sealed record Sale
 {
+    public decimal? MarkupOverride { get; init; }
+    public string MarkupOverrideReason { get; init; } = "";
     public string InvoiceNumber { get; init; } = "";
     public int SourceRow { get; init; }
     public string SourceIdentity { get; init; } = "";
@@ -274,6 +285,7 @@ public sealed record SaleReturn
 
 public sealed record Ledger
 {
+    public List<MarkupPeriod> MarkupPeriods { get; init; } = [];
     public List<OfferEntry> Offers { get; init; } = [];
     public bool BrandRulesInitialized { get; init; }
     public List<Brand> Brands { get; init; } = [];
@@ -349,6 +361,7 @@ public static class Rules
     public static void Validate(Sale sale)
     {
         if (!ValidDate(sale.Date) || string.IsNullOrWhiteSpace(sale.Code) || sale.Quantity <= 0 || sale.UnitPrice <= 0 || sale.Total <= 0 || sale.Deductions < 0 || NetSaleBase(sale) < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
+        if (sale.MarkupOverride < 0 || (sale.MarkupOverride.HasValue && string.IsNullOrWhiteSpace(sale.MarkupOverrideReason))) throw new InvalidDataException("مارک‌آپ مخصوص فروش باید نامنفی باشد و دلیل داشته باشد.");
         if (!HasRateSnapshot(sale))
         {
             if (sale.EstimatedCostOverride.HasValue) throw new InvalidDataException("هزینهٔ دستی فقط برای فروشِ دارای برند و تنظیمات تأییدشده مجاز است.");
@@ -356,6 +369,7 @@ public static class Rules
         }
         if (sale.CashShare < 0 || sale.CreditShare < 0 || sale.CashDiscount < 0 || sale.PurchaseDiscount < 0 || sale.Offer < 0 || sale.Markup < 0 || sale.CashShare + sale.CreditShare != 1 || sale.CashDiscount > 1 || sale.PurchaseDiscount + sale.Offer > 1 || sale.EstimatedCostOverride < 0) throw new InvalidDataException("اطلاعات فروش نامعتبر است.");
         if (sale.RateMonthKey != MonthOf(sale.Date)) throw new InvalidDataException("ماه Snapshot فروش با تاریخ آن سازگار نیست.");
+        if (sale.MarkupOverride.HasValue && sale.Markup != sale.MarkupOverride.Value) throw new InvalidDataException("مارک‌آپ محاسبه با مارک‌آپ اختصاصی فروش سازگار نیست.");
         if (sale.EstimatedCostOverride.HasValue && string.IsNullOrWhiteSpace(sale.EstimatedCostOverrideNote)) throw new InvalidDataException("برای هزینهٔ دستی فروش، دلیل را وارد کنید.");
     }
     public static void Validate(SaleReturn saleReturn)

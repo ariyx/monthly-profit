@@ -8,21 +8,21 @@ namespace Profit.Desktop;
 
 public sealed class ImportReviewDialog : Window
 {
-    public ImportReviewDialog(IEnumerable<string> changes)
+    public ImportReviewDialog(IEnumerable<string> changes, string? explanation = null, string? acceptText = null)
     {
         Title = "بازبینی ردیف‌های اصلاح‌شده"; Width = 850; Height = 620;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        FlowDirection = FlowDirection.RightToLeft;
+        FlowDirection = FlowDirection.LeftToRight;
         var root = new DockPanel { Margin = new Thickness(20) }; Content = root;
         var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         DockPanel.SetDock(footer, Dock.Bottom); root.Children.Add(footer);
-        var accept = new Button { Content = "تأیید جایگزینی و ورود فایل", Style = (Style)FindResource("Primary") };
+        var accept = new Button { Content = acceptText ?? "تأیید جایگزینی و ورود فایل", Style = (Style)FindResource("Primary") };
         accept.Click += (_, _) => DialogResult = true; footer.Children.Add(accept);
         footer.Children.Add(new Button { Content = "انصراف؛ هیچ تغییری ثبت نشود", IsCancel = true });
-        var header = new TextBlock { Text = "این ردیف‌ها قبلاً وارد شده‌اند و محتوایشان تغییر کرده است. با تأیید، رکورد قبلی جایگزین و محاسبات دوباره انجام می‌شود.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16) };
+        var header = new TextBlock { Text = explanation ?? "این ردیف‌ها قبلاً وارد شده‌اند و محتوایشان تغییر کرده است. با تأیید، رکورد قبلی جایگزین و محاسبات دوباره انجام می‌شود.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 16), FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left };
         DockPanel.SetDock(header, Dock.Top); root.Children.Add(header);
-        root.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = new TextBlock { Text = string.Join("\n\n", changes), TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right } });
+        root.Children.Add(new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = new TextBlock { Text = string.Join("\n\n", changes), TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left } });
     }
 }
 

@@ -12,6 +12,7 @@ public static class LedgerCalculator
 {
     public static LedgerCalculation Calculate(Ledger ledger)
     {
+        MarkupRules.Validate(ledger);
         foreach (var brand in ledger.Brands) Rules.Validate(brand);
         BrandPrefixRules.ValidateUnique(ledger.Brands);
         if (ledger.Brands.Select(x => Rules.Normalize(x.Name)).Distinct(StringComparer.OrdinalIgnoreCase).Count() != ledger.Brands.Count) throw new InvalidDataException("نام برند تکراری است.");
