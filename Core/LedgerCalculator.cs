@@ -4,6 +4,7 @@ public sealed class LedgerCalculation
 {
     public Dictionary<string, SaleSettlement> Sales { get; } = [];
     public ReturnMatchingResult Returns { get; init; } = new();
+    public OfferCalculation Offers { get; init; } = new();
 }
 
 // محاسبه کاملاً فروش‌محور است: خرید، موجودی و FIFO در این مدل وجود ندارند.
@@ -32,7 +33,8 @@ public static class LedgerCalculator
 
         var matching = SalesReturnMatcher.Match(ledger.Sales, ledger.Returns);
         var allocations = matching.Allocations.GroupBy(x => x.SaleId, StringComparer.Ordinal).ToDictionary(x => x.Key, x => x.ToList(), StringComparer.Ordinal);
-        var result = new LedgerCalculation { Returns = matching };
+        var offers = OfferRules.Calculate(ledger);
+        var result = new LedgerCalculation { Returns = matching, Offers = offers };
         foreach (var sale in ledger.Sales)
         {
             // تا وقتی برند و Snapshot ماهانه مشخص نشده‌اند، فروش ذخیره می‌شود اما در سود وارد نمی‌شود.
@@ -45,6 +47,8 @@ public static class LedgerCalculator
             var returnRecalculatedBase = allocationsForSale.Sum(x =>
                 (sale.Deductions * x.Quantity / sale.Quantity + x.ReturnNetAmount) - sale.Total * x.Quantity / sale.Quantity);
             var invoiceBase = Rules.NetSaleBase(sale) * remainingQuantity / sale.Quantity + returnRecalculatedBase;
+            // Offer deductions remain intact on a partial sale return and are released only by an offer return.
+            invoiceBase += offers.SaleAdjustments.GetValueOrDefault(sale.Id);
             var grossPurchaseUnit = Rules.GrossPurchaseUnitFromSale(sale);
             var netCostUnit = Rules.EstimatedNetCostUnit(sale);
             var split = Rules.SplitSale(sale, invoiceBase);
@@ -76,9 +80,11 @@ public static class LedgerCalculator
         var codes = calculatedSales.Select(x => x.Code).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var items = ledger.Items.Where(x => codes.Contains(x.Code, StringComparer.OrdinalIgnoreCase)).ToList();
         var returnsForMonth = ledger.Returns.Where(x => Rules.MonthOf(x.Date) == month.Key).ToList();
-        return new LedgerTotal(settled.Sum(x => x.Settlement.Cost), settled.Sum(x => x.Settlement.Cash), settled.Sum(x => x.Settlement.Credit), settled.Sum(x => x.Settlement.Profit), month.FixedCost, calculatedSales.Sum(x => x.Quantity - calculation.Sales[x.Id].ReturnedQuantity), codes.Count, items.Select(x => x.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count())
+        var manualCredit = calculation.Offers.UnlinkedReturnCredits.GetValueOrDefault(month.Key);
+        return new LedgerTotal(settled.Sum(x => x.Settlement.Cost), settled.Sum(x => x.Settlement.Cash), settled.Sum(x => x.Settlement.Credit), settled.Sum(x => x.Settlement.Profit) + manualCredit, month.FixedCost, calculatedSales.Sum(x => x.Quantity - calculation.Sales[x.Id].ReturnedQuantity), codes.Count, items.Select(x => x.Brand).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).Count())
         {
-            InvoiceSales = settled.Sum(x => x.Settlement.InvoiceBase),
+            UnlinkedOfferCredit = manualCredit,
+            InvoiceSales = settled.Sum(x => x.Settlement.InvoiceBase) + manualCredit,
             CashDiscountAmount = settled.Sum(x => Rules.CashDiscountAmount(x.Sale, x.Settlement.InvoiceBase)),
             PendingSalesCount = sales.Count - calculatedSales.Count,
             PendingInvoiceSales = sales.Where(x => !calculation.Sales.ContainsKey(x.Id)).Sum(Rules.NetSaleBase),

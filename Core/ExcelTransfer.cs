@@ -34,6 +34,8 @@ public static class ExcelTransfer
             new object?[] { "هزینه ثابت ماه", total.FixedCost }, new object?[] { "نتیجه پس از هزینه ثابت", total.Net }, new object?[] { "حاشیه سود", total.Margin },
             new object?[] { "فروش‌های معلق", total.PendingSalesCount }, new object?[] { "مبلغ فاکتور فروش‌های معلق", total.PendingInvoiceSales },
             new object?[] { "تعداد برگشتی اعمال‌شده", total.ReturnedQuantity }, new object?[] { "برگشت‌های معلق", total.PendingReturnsCount },
+            new object?[] { "آفرهای نیازمند بررسی", calculation.Offers.Rows.Count(x => Rules.MonthOf(x.Entry.Date) == month.Key && !x.UnitPrice.HasValue) },
+            new object?[] { "اصلاح دستی برگشت آفر بدون فروش اصلی", total.UnlinkedOfferCredit },
             new object?[] { "توضیح", "هزینه خرید از قیمت همان فروش و درصدهای Snapshot‌شده استخراج شده است." }
         };
         WriteWorkbook(file, rows, summary, "فروش‌های ماه", "خلاصه ماه", "گزارش جزئیات فروش", $"ماه {month.Key}", companyLogo);
@@ -52,6 +54,7 @@ public static class ExcelTransfer
             new object?[] { "بهای تمام‌شده", totals.Sum(x => x.Total.Cost) }, new object?[] { "تعداد برگشتی", totals.Sum(x => x.Total.ReturnedQuantity) }, new object?[] { "فروش واقعی", sales }, new object?[] { "سود خالص فروش", totals.Sum(x => x.Total.Profit) },
             new object?[] { "هزینه ثابت", totals.Sum(x => x.Total.FixedCost) }, new object?[] { "نتیجه", totals.Sum(x => x.Total.Net) }, new object?[] { "حاشیه سود وزنی", sales == 0 ? null : totals.Sum(x => x.Total.Profit) / sales }
         };
+        summary.Add(new object?[] { "اصلاح دستی برگشت آفر بدون فروش اصلی", totals.Sum(x => x.Total.UnlinkedOfferCredit) });
         WriteWorkbook(file, rows, summary, "گزارش بازه", "خلاصه بازه", "گزارش عملکرد ماهانه", $"از {totals.First().Month.Key} تا {totals.Last().Month.Key}", companyLogo);
     }
 

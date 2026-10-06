@@ -112,7 +112,8 @@ public partial class MainWindow : Window
         ClosedBadge.Text = current.IsClosed ? "ماه بسته" : "ماه باز"; ClosedBadge.Foreground = current.IsClosed ? Brushes.IndianRed : Brushes.SeaGreen;
         Fixed.Text = Rules.Money(current.FixedCost);
         Breakdown.Text = $"فروش پس از کسورات فاکتور: {Rules.ReportMoney(total.InvoiceSales)} ریال\nتخفیف نقدی: {Rules.ReportMoney(total.CashDiscountAmount)} ریال\nدریافتی نقدی: {Rules.ReportMoney(total.Cash)} ریال\nفروش چکی: {Rules.ReportMoney(total.Credit)} ریال\nبهای تمام‌شده فروش‌ها: {Rules.ReportMoney(total.Cost)} ریال\nبرند: {total.Brands}   |   کالا: {total.Products}";
-        DrawSales(); DrawBrands(); DrawBrandSettings(); DrawUnknown(); DrawHistory(); DrawBackupStatus();
+        if (total.UnlinkedOfferCredit != 0) Breakdown.Text += $"\nاصلاح دستی برگشت آفر بدون فروش اصلی: {Rules.ReportMoney(total.UnlinkedOfferCredit)} ریال";
+        DrawSales(); DrawBrands(); DrawBrandSettings(); DrawUnknown(); DrawHistory(); DrawBackupStatus(); DrawOffers();
         Status.Text = $"ماه {current.Key} · {ledger.Sales.Count(x => Rules.MonthOf(x.Date) == current.Key)} فروش ثبت شده" +
             (total.ReturnedQuantity == 0 ? "" : $" · {Rules.Money(total.ReturnedQuantity)} واحد برگشتی") +
             (total.PendingSalesCount == 0 ? "" : $" · {total.PendingSalesCount} فروش معلق");
@@ -242,7 +243,9 @@ public partial class MainWindow : Window
         {
             var sales = ledger.Sales.ToList(); var index = sales.FindIndex(x => x.Id == row.Value.Id);
             if (index < 0) throw new InvalidOperationException("فروش انتخاب‌شده یافت نشد.");
-            sales[index] = dialog.Value; SaveLedger(ledger with { Sales = sales }, "فروش ویرایش شد.", Rules.MonthOf(dialog.Value.Date));
+            sales[index] = dialog.Value;
+            var next = ledger with { Sales = sales };
+            if (CanSaveFinancialChange(next)) SaveLedger(next, "فروش ویرایش شد.", Rules.MonthOf(dialog.Value.Date));
         });
     }
     void DrawSales()
@@ -272,54 +275,116 @@ public partial class MainWindow : Window
     }
     void ImportSales(object s, RoutedEventArgs e)
     {
-        var file = new OpenFileDialog { Filter = "فایل اکسل|*.xls;*.xlsx", Title = "ورود فروش از اکسل" };
-        if (file.ShowDialog(this) != true) return;
-        Guard(() =>
-        {
-            var review = TransactionImport.Review(file.FileName);
-            if (review.Issues.Count > 0) throw new InvalidDataException($"{review.Issues.Count} ردیف اکسل نامعتبر است. نمونه: ردیف {review.Issues[0].Row} — {review.Issues[0].Message}");
-            var known = review.Rows.Where(x => !ledger.ImportedRows.Contains(x.ImportKey)).ToList();
-            var importMonths = known.Select(x => Rules.MonthOf(x.Date)).Distinct(StringComparer.Ordinal).OrderBy(x => x, StringComparer.Ordinal).ToList();
-            if (importMonths.Any(x => !CanEdit(x))) return;
-            var items = ledger.Items.ToList();
-            var sales = new List<Sale>();
-            foreach (var row in known)
-            {
-                var item = items.FirstOrDefault(x => x.Code.Equals(row.Code, StringComparison.OrdinalIgnoreCase));
-                var brand = item?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, row.Code)?.Name ?? "";
-                if (item == null) { item = new CatalogItem { Code = row.Code, Name = row.Name, Brand = brand }; items.Add(item); }
-                var rawSale = new Sale { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey };
-                var month = Rules.MonthOf(row.Date); var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, month);
-                sales.Add(rate is null ? rawSale : BrandMonthRules.Apply(rawSale, rate, month));
-            }
-            var pending = sales.Count(x => !Rules.HasRateSnapshot(x));
-            SaveLedger(ledger with { Items = items, Sales = [.. ledger.Sales, .. sales], ImportedRows = [.. ledger.ImportedRows, .. known.Select(x => x.ImportKey)] }, $"{sales.Count} فروش از اکسل وارد شد." + (review.Ignored == 0 ? "" : $" {review.Ignored} ردیف آفر با قیمت واحد ۱ نادیده گرفته شد.") + (pending == 0 ? "" : $" {pending} ردیف تا تعیین برند یا تأیید ماه، معلق است."));
-        });
+        ImportTransactions(false);
     }
 
     void ImportReturns(object s, RoutedEventArgs e)
     {
-        var file = new OpenFileDialog { Filter = "فایل اکسل|*.xls;*.xlsx", Title = "ورود برگشت از فروش از اکسل" };
+        ImportTransactions(true);
+    }
+
+    void ImportTransactions(bool isReturn)
+    {
+        var file = new OpenFileDialog { Filter = "فایل اکسل|*.xls;*.xlsx", Title = isReturn ? "ورود برگشت از فروش و آفر" : "ورود فروش و آفر" };
         if (file.ShowDialog(this) != true) return;
         Guard(() =>
         {
             var review = TransactionImport.Review(file.FileName);
             if (review.Issues.Count > 0) throw new InvalidDataException($"{review.Issues.Count} ردیف اکسل نامعتبر است. نمونه: ردیف {review.Issues[0].Row} — {review.Issues[0].Message}");
-            var known = review.Rows.Where(x => !ledger.ImportedReturnRows.Contains(x.ImportKey)).ToList();
-            if (known.Count == 0) throw new InvalidDataException("هیچ ردیف جدیدی برای برگشت از فروش پیدا نشد.");
-            var returns = known.Select(row => new SaleReturn
+            var existing = isReturn
+                ? ledger.Returns.Select(x => new ImportRecord(x.Id, x.ImportKey, x.SourceIdentity, x.SourceFingerprint.Length > 0 ? x.SourceFingerprint : ImportMerge.Fingerprint(x.Date, x.Code, x.Customer, x.Quantity, x.UnitPrice, x.Total, x.Deductions)))
+                : ledger.Sales.Select(x => new ImportRecord(x.Id, x.ImportKey, x.SourceIdentity, x.SourceFingerprint.Length > 0 ? x.SourceFingerprint : ImportMerge.Fingerprint(x.Date, x.Code, x.Customer, x.Quantity, x.UnitPrice, x.Total, x.Deductions)));
+            var plan = ImportMerge.Plan(review.Rows, existing);
+            var offerPlan = ImportMerge.Plan(review.Offers, ledger.Offers.Where(x => x.IsReturn == isReturn).Select(x => new ImportRecord(x.Id, x.ImportKey, x.SourceIdentity, x.SourceFingerprint)));
+            var replacements = plan.Replacements.Concat(offerPlan.Replacements).ToList();
+            if (replacements.Count > 0)
             {
-                Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity,
-                UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, ImportKey = row.ImportKey
-            }).ToList();
-            var staged = ledger with { Returns = [.. ledger.Returns, .. returns], ImportedReturnRows = [.. ledger.ImportedReturnRows, .. known.Select(x => x.ImportKey)] };
-            var matching = SalesReturnMatcher.Match(staged.Sales, staged.Returns);
-            var affectedMonths = matching.Allocations.Where(x => returns.Any(r => r.Id == x.ReturnId))
-                .Select(x => staged.Sales.First(s => s.Id == x.SaleId)).Select(x => Rules.MonthOf(x.Date)).Distinct(StringComparer.Ordinal).ToList();
-            if (affectedMonths.Any(x => !CanEdit(x))) return;
-            var matchedReturns = returns.Count(x => matching.Allocations.Any(a => a.ReturnId == x.Id));
-            var pendingReturns = returns.Count - matchedReturns;
-            SaveLedger(staged, $"{returns.Count} برگشت از اکسل وارد شد؛ {matchedReturns} مورد اعمال شد." + (review.Ignored == 0 ? "" : $" {review.Ignored} ردیف آفر با قیمت واحد ۱ نادیده گرفته شد.") + (pendingReturns == 0 ? "" : $" {pendingReturns} مورد تطبیق کافی ندارد و معلق است."));
+                var lines = replacements.Select(x =>
+                {
+                    var oldSale = ledger.Sales.FirstOrDefault(s => s.Id == x.Existing.Id);
+                    var oldReturn = ledger.Returns.FirstOrDefault(s => s.Id == x.Existing.Id);
+                    var oldOffer = ledger.Offers.FirstOrDefault(s => s.Id == x.Existing.Id);
+                    var oldQuantity = oldSale?.Quantity ?? oldReturn?.Quantity ?? oldOffer?.Quantity ?? 0;
+                    var oldPrice = oldSale?.UnitPrice ?? oldReturn?.UnitPrice ?? 1;
+                    var oldTotal = oldSale?.Total ?? oldReturn?.Total ?? oldQuantity;
+                    var oldDeductions = oldSale?.Deductions ?? oldReturn?.Deductions ?? 0;
+                    return $"ردیف {x.Row.Row} · فاکتور {x.Row.InvoiceNumber} · کد {x.Row.Code} · {x.Row.Account}\nقبلی: تعداد {Rules.Money(oldQuantity)}، قیمت {Rules.Money(oldPrice)}، مبلغ {Rules.Money(oldTotal)}، کسورات {Rules.Money(oldDeductions)}\nجدید: تعداد {Rules.Money(x.Row.Quantity)}، قیمت {Rules.Money(x.Row.UnitPrice)}، مبلغ {Rules.Money(x.Row.Total)}، کسورات {Rules.Money(x.Row.Deductions)}";
+                });
+                var dialog = new ImportReviewDialog(lines) { Owner = this };
+                if (dialog.ShowDialog() != true) return;
+            }
+            var changes = plan.Added.Concat(plan.Replacements.Select(x => x.Row)).Concat(offerPlan.Added).Concat(offerPlan.Replacements.Select(x => x.Row));
+            if (changes.Select(x => Rules.MonthOf(x.Date)).Distinct().Any(x => !CanEdit(x))) return;
+            var items = ledger.Items.ToList(); var sales = ledger.Sales.ToList(); var returns = ledger.Returns.ToList(); var offers = ledger.Offers.ToList();
+            var operations = plan.Matched.Concat(plan.Replacements).Select(x => (Row: x.Row, Id: x.Existing.Id)).Concat(plan.Added.Select(x => (Row: x, Id: Guid.NewGuid().ToString("N"))));
+            foreach (var (row, id) in operations)
+            {
+                if (isReturn)
+                {
+                    var prior = returns.FirstOrDefault(x => x.Id == id) ?? new SaleReturn { Id = id };
+                    var value = prior with { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint, ImportKey = row.ImportKey };
+                    // A repeated import enriches metadata but preserves intentional in-app edits.
+                    if (plan.Matched.Any(x => x.Existing.Id == id)) value = prior with { InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint };
+                    returns.RemoveAll(x => x.Id == id); returns.Add(value);
+                }
+                else
+                {
+                    var item = items.FirstOrDefault(x => x.Code.Equals(row.Code, StringComparison.OrdinalIgnoreCase));
+                    var brand = item?.Brand ?? BrandPrefixRules.Detect(ledger.Brands, row.Code)?.Name ?? "";
+                    if (item is null) { item = new CatalogItem { Code = row.Code, Name = row.Name, Brand = brand }; items.Add(item); }
+                    var prior = sales.FirstOrDefault(x => x.Id == id) ?? new Sale { Id = id };
+                    var value = prior with { Date = row.Date, Code = row.Code, Customer = row.Account, Quantity = row.Quantity, UnitPrice = row.UnitPrice, Total = row.Total, Deductions = row.Deductions, InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint, ImportKey = row.ImportKey };
+                    if (plan.Matched.Any(x => x.Existing.Id == id)) value = prior with { InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint };
+                    else
+                    {
+                        var rate = string.IsNullOrWhiteSpace(brand) ? null : BrandMonthRules.TryConfirmed(ledger, brand, Rules.MonthOf(row.Date));
+                        if (rate is not null) value = BrandMonthRules.Apply(value, rate, Rules.MonthOf(row.Date));
+                    }
+                    sales.RemoveAll(x => x.Id == id); sales.Add(value);
+                }
+            }
+            var offerOperations = offerPlan.Matched.Concat(offerPlan.Replacements).Select(x => (Row: x.Row, Id: x.Existing.Id)).Concat(offerPlan.Added.Select(x => (Row: x, Id: Guid.NewGuid().ToString("N"))));
+            foreach (var (row, id) in offerOperations)
+            {
+                var prior = offers.FirstOrDefault(x => x.Id == id) ?? new OfferEntry { Id = id };
+                var value = prior with { IsReturn = isReturn, Date = row.Date, Code = row.Code, Name = row.Name, Customer = row.Account, Quantity = row.Quantity, InvoiceNumber = row.InvoiceNumber, SourceRow = row.Row, SourceIdentity = row.Identity, SourceFingerprint = row.Fingerprint, ImportKey = row.ImportKey };
+                offers.RemoveAll(x => x.Id == id); offers.Add(value);
+            }
+            var staged = ledger with { Items = items, Sales = sales, Returns = returns, Offers = offers };
+            if (!CanSaveFinancialChange(staged)) return;
+            SaveLedger(staged, $"{plan.Added.Count} ردیف عادی و {offerPlan.Added.Count} آفر جدید؛ {replacements.Count} ردیف اصلاح شد؛ {plan.Matched.Count + offerPlan.Matched.Count} تکراری وارد نشد؛ {review.Ignored} ردیف تبلیغاتی/خالی نادیده گرفته شد.");
+        });
+    }
+
+    bool CanSaveFinancialChange(Ledger staged)
+    {
+        var next = LedgerCalculator.Calculate(staged);
+        foreach (var key in store.Keys().Where(x => store.Load(x).IsClosed))
+        {
+            var month = store.Load(key);
+            if (LedgerCalculator.SummarizeMonth(ledger, month, calculation) != LedgerCalculator.SummarizeMonth(staged, month, next)) return CanEdit(key);
+            var ids = ledger.Sales.Concat(staged.Sales).Where(x => Rules.MonthOf(x.Date) == key).Select(x => x.Id).Distinct();
+            if (ids.Any(id => calculation.Sales.GetValueOrDefault(id) != next.Sales.GetValueOrDefault(id))) return CanEdit(key);
+        }
+        return true;
+    }
+
+    void DrawOffers()
+    {
+        var rows = calculation.Offers.Rows.Where(x => Rules.MonthOf(x.Entry.Date) == current.Key).Select(x => new OfferGridRow(x, ledger, calculation)).ToList();
+        OffersGrid.ItemsSource = rows;
+        OfferSummary.Text = $"{rows.Count} آفر در ماه {current.Key} · {rows.Count(x => x.NeedsReview)} مورد نیازمند بررسی · مبلغ‌ها به ریال هستند.";
+    }
+    void OfferDoubleClick(object sender, MouseButtonEventArgs e) => EditOffer(sender, e);
+    void EditOffer(object sender, RoutedEventArgs e)
+    {
+        if (OffersGrid.SelectedItem is not OfferGridRow row || !CanEdit(Rules.MonthOf(row.Value.Date))) return;
+        var dialog = new OfferEditDialog(row.Value, ledger.Sales) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Value is null) return;
+        Guard(() =>
+        {
+            var next = ledger with { Offers = ledger.Offers.Select(x => x.Id == row.Value.Id ? dialog.Value : x).ToList() };
+            if (CanSaveFinancialChange(next)) SaveLedger(next, "تعیین دستی آفر ثبت شد و محاسبات دوباره انجام شد.");
         });
     }
 
@@ -516,6 +581,24 @@ public partial class MainWindow : Window
         LastManualBackup.Text = preferences.LastBackupUtc == null ? "هنوز یک پشتیبان دستی ایجاد نشده است." : "آخرین پشتیبان دستی: " + preferences.LastBackupUtc.Value.ToLocalTime().ToString("yyyy/MM/dd HH:mm");
     }
     void CopyVersion(object s, RoutedEventArgs e) { Clipboard.SetText("شرکت متحد توزیع ایرانیان | سامانه مدیریت سود فروش | نسخه ۰٫۶٫۰"); Status.Text = "اطلاعات نسخه کپی شد."; }
+}
+
+public sealed class OfferGridRow(OfferResolution resolution, Ledger ledger, LedgerCalculation calculation)
+{
+    public OfferEntry Value => resolution.Entry;
+    public string Date => Value.Date;
+    public string Kind => Value.IsReturn ? "برگشت آفر" : "آفر فروش";
+    public string Invoice => Value.InvoiceNumber;
+    public string Customer => Value.Customer;
+    public string Code => Value.Code;
+    public string Name => Value.Name;
+    public string Quantity => Rules.Money(Value.Quantity);
+    public string Price => resolution.UnitPrice.HasValue ? Rules.Money(resolution.UnitPrice.Value) : "—";
+    public string Amount => resolution.UnitPrice.HasValue ? Rules.Money(resolution.Amount) : "—";
+    public string RelatedSale => string.Join(" / ", ledger.Sales.Where(x => resolution.SaleId.Split(',').Contains(x.Id)).Select(x => $"{x.Date} · فاکتور {x.InvoiceNumber} · کد {x.Code}"));
+    public bool NeedsReview => !resolution.UnitPrice.HasValue;
+    public string Status => resolution.SaleId.Length > 0 && resolution.SaleId.Split(',').Any(x => !calculation.Sales.ContainsKey(x)) ? resolution.Status + "؛ منتظر تأیید برند/ماه" : resolution.Status;
+    public string Reason => Value.ManualReason;
 }
 
 public sealed class SaleGridRow(Sale sale, CatalogItem item, SaleSettlement? settlement)

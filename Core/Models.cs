@@ -228,6 +228,10 @@ public static class BrandPrefixRules
 public sealed record CatalogItem { public string Code { get; init; } = ""; public string Name { get; init; } = ""; public string Brand { get; init; } = ""; }
 public sealed record Sale
 {
+    public string InvoiceNumber { get; init; } = "";
+    public int SourceRow { get; init; }
+    public string SourceIdentity { get; init; } = "";
+    public string SourceFingerprint { get; init; } = "";
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public string Date { get; init; } = "";
     public string Code { get; init; } = "";
@@ -253,6 +257,10 @@ public sealed record Sale
 // نیز بدون نگه‌داری وضعیتِ ناسازگار دوباره ساخته می‌شوند.
 public sealed record SaleReturn
 {
+    public string InvoiceNumber { get; init; } = "";
+    public int SourceRow { get; init; }
+    public string SourceIdentity { get; init; } = "";
+    public string SourceFingerprint { get; init; } = "";
     public string Id { get; init; } = Guid.NewGuid().ToString("N");
     public string Date { get; init; } = "";
     public string Code { get; init; } = "";
@@ -266,6 +274,7 @@ public sealed record SaleReturn
 
 public sealed record Ledger
 {
+    public List<OfferEntry> Offers { get; init; } = [];
     public bool BrandRulesInitialized { get; init; }
     public List<Brand> Brands { get; init; } = [];
     public List<BrandMonthSettings> BrandMonths { get; init; } = [];
@@ -286,7 +295,8 @@ public sealed record SaleSettlement(decimal Cost, decimal Cash, decimal Credit, 
 }
 public sealed record LedgerTotal(decimal Cost, decimal Cash, decimal Credit, decimal Profit, decimal FixedCost, decimal Quantity, int Products, int Brands)
 {
-    public decimal Sales => Cash + Credit;
+    public decimal Sales => Cash + Credit + UnlinkedOfferCredit;
+    public decimal UnlinkedOfferCredit { get; init; }
     public decimal InvoiceSales { get; init; }
     public decimal CashDiscountAmount { get; init; }
     public int PendingSalesCount { get; init; }

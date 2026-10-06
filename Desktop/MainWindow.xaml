@@ -137,6 +137,34 @@
 </DataGrid.Columns></DataGrid>
 </DockPanel>
 </TabItem>
+<TabItem Header="آفرها">
+<DockPanel Margin="22">
+<Border DockPanel.Dock="Top" Style="{StaticResource Panel}">
+<StackPanel FlowDirection="RightToLeft">
+<TextBlock Text="آفرهای فروش و برگشت" Style="{StaticResource PageTitle}" TextAlignment="Right"/>
+<TextBlock x:Name="OfferSummary" TextWrapping="Wrap" TextAlignment="Right" Margin="0,8,0,10"/>
+<TextBlock Text="آفرها همراه همان فایل فروش یا برگشت وارد می‌شوند. تستر، سمپل و اقلام تبلیغاتی کنار گذاشته می‌شوند." TextAlignment="Right" TextWrapping="Wrap"/>
+<Button Content="بررسی / تعیین دستی ردیف انتخاب‌شده" Click="EditOffer" HorizontalAlignment="Right" Margin="0,12,0,0"/>
+</StackPanel>
+</Border>
+<DataGrid x:Name="OffersGrid" MouseDoubleClick="OfferDoubleClick" VerticalScrollBarVisibility="Visible">
+<DataGrid.Columns>
+<DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="0.8*"/>
+<DataGridTextColumn Header="نوع" Binding="{Binding Kind}" Width="0.8*"/>
+<DataGridTextColumn Header="فاکتور" Binding="{Binding Invoice}" Width="0.7*"/>
+<DataGridTextColumn Header="مشتری" Binding="{Binding Customer}" Width="1.4*"/>
+<DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="0.8*"/>
+<DataGridTextColumn Header="کالا" Binding="{Binding Name}" Width="1.5*"/>
+<DataGridTextColumn Header="تعداد" Binding="{Binding Quantity}" Width="0.6*"/>
+<DataGridTextColumn Header="قیمت اصلی" Binding="{Binding Price}" Width="0.9*"/>
+<DataGridTextColumn Header="مبلغ آفر" Binding="{Binding Amount}" Width="1*"/>
+<DataGridTextColumn Header="فروش مرتبط" Binding="{Binding RelatedSale}" Width="1.3*"/>
+<DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.4*"/>
+<DataGridTextColumn Header="دلیل دستی" Binding="{Binding Reason}" Width="1*"/>
+</DataGrid.Columns>
+</DataGrid>
+</DockPanel>
+</TabItem>
 <TabItem Header="موجودی" Visibility="Collapsed">
 <DockPanel Margin="22">
 <Border DockPanel.Dock="Top" Style="{StaticResource Panel}"><StackPanel FlowDirection="LeftToRight" HorizontalAlignment="Stretch">

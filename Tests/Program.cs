@@ -165,8 +165,52 @@ public static void Main()
 </Table></Worksheet></Workbook>
 """);
     var offerReview = TransactionImport.Review(importFile);
-    Test.Equal(1, offerReview.Ignored, "only unit price one is ignored as offer");
+    Test.Equal(0, offerReview.Ignored, "ordinary offers are retained");
+    Test.Equal(1, offerReview.Offers.Count, "unit price one is imported separately as offer");
     Test.Equal(1, offerReview.Rows.Count, "unit price two remains importable");
+
+    Test.True(OfferRules.IsPromotional("ادکلن تستر"), "testers are excluded");
+    Test.True(OfferRules.IsPromotional("استند ایستاده"), "promotional stands are excluded");
+    Test.True(!OfferRules.IsPromotional("کرم بلوبری"), "ordinary product is not promotional");
+    var offerSale = sale with { Id = "offer-sale", InvoiceNumber = "11", SourceRow = 53, Date = "14050620", Customer = "offer customer", Quantity = 4, UnitPrice = 6_150_000m, Total = 24_600_000m, Deductions = 0, CashShare = 1, CreditShare = 0, CashDiscount = 0 };
+    var offerEntry = new OfferEntry { Id = "offer-1", InvoiceNumber = "11", SourceRow = 54, Date = offerSale.Date, Customer = offerSale.Customer, Code = offerSale.Code, Name = "کالای آزمایشی", Quantity = 1 };
+    var offerLedger = ledger with { Sales = [offerSale], Returns = [], Offers = [offerEntry] };
+    var offerCalculation = LedgerCalculator.Calculate(offerLedger);
+    Test.Equal(18_450_000m, offerCalculation.Sales[offerSale.Id].InvoiceBase, "offer is deducted once from invoice before split");
+    Test.Throws(() => OfferRules.Calculate(offerLedger with { Offers = [offerEntry with { ManualSaleId = offerSale.Id, Customer = "other customer", ManualReason = "test" }] }), "manual offer cannot link another customer sale");
+    var partialReturn = new SaleReturn { Id = "partial-offer-sale-return", InvoiceNumber = "12", Date = "14050622", Customer = offerSale.Customer, Code = offerSale.Code, Quantity = 2, UnitPrice = offerSale.UnitPrice, Total = 12_300_000m };
+    var partialOfferLedger = offerLedger with { Returns = [partialReturn] };
+    var partialOfferCalculation = LedgerCalculator.Calculate(partialOfferLedger);
+    Test.Equal(6_150_000m, partialOfferCalculation.Sales[offerSale.Id].InvoiceBase, "partial return keeps full offer deduction without double counting");
+    Test.Equal(offerCalculation.Sales[offerSale.Id].Cost / 2, partialOfferCalculation.Sales[offerSale.Id].Cost, "partial return cost follows remaining paid quantity");
+    var returnOffer = offerEntry with { Id = "offer-return", IsReturn = true, Date = "14050622", InvoiceNumber = "12", SourceRow = 2 };
+    var withOfferReturn = partialOfferLedger with { Offers = [offerEntry, returnOffer] };
+    Test.Equal(12_300_000m, LedgerCalculator.Calculate(withOfferReturn).Sales[offerSale.Id].InvoiceBase, "returned offer releases the original sale price");
+    var completeReturn = partialReturn with { Quantity = 4, Total = offerSale.Total };
+    Test.Equal(0m, LedgerCalculator.Calculate(withOfferReturn with { Returns = [completeReturn] }).Sales[offerSale.Id].InvoiceBase, "full sale and offer return settle to zero");
+    var tooManyOffers = returnOffer with { Id = "too-many-offers", Quantity = 2, ManualUnitPrice = offerSale.UnitPrice, ManualReason = "test" };
+    Test.True(!OfferRules.Calculate(offerLedger with { Offers = [offerEntry, tooManyOffers] }).Rows.Single(x => x.Entry.IsReturn).UnitPrice.HasValue, "manual price cannot bypass insufficient original offer quantity");
+    var orphan = returnOffer with { ManualUnitPrice = offerSale.UnitPrice, ManualReason = "فروش سال قبل موجود نیست" };
+    var orphanLedger = offerLedger with { Sales = [], Offers = [orphan] };
+    Test.Equal(offerSale.UnitPrice, LedgerCalculator.SummarizeMonth(orphanLedger, new Month { Key = "1405/06" }).Profit, "orphan manual valuation is credited once in return month");
+    var laterMatched = OfferRules.Calculate(offerLedger with { Offers = [offerEntry, orphan] });
+    Test.Equal(0, laterMatched.UnlinkedReturnCredits.Count, "later automatic match supersedes manual valuation");
+    Test.Equal(0m, laterMatched.SaleAdjustments[offerSale.Id], "original and returned offers net to zero after late match");
+    var reordered = offerSale with { Id = "reordered-sale", SourceRow = 99 };
+    Test.Equal("", OfferRules.Calculate(offerLedger with { Sales = [offerSale, reordered with { UnitPrice = offerSale.UnitPrice + 1 }] }).Rows.Single().SaleId, "ambiguous different-price offers should not pick a sale");
+
+    var importRow = offerReview.Rows.Single() with { InvoiceNumber = "99", Identity = "invoice:1", Fingerprint = "content-A" };
+    var existingRow = new ImportRecord("saved", importRow.ImportKey, importRow.Identity, importRow.Fingerprint);
+    Test.Equal(0, ImportMerge.Plan([importRow], [existingRow]).Added.Count, "same file is not imported again");
+    var overlappingRow = importRow with { ImportKey = "another-file:10", Row = 10 };
+    Test.Equal(1, ImportMerge.Plan([overlappingRow], [existingRow]).Matched.Count, "overlapping different file is recognized");
+    var correctedRow = overlappingRow with { Fingerprint = "content-B", Quantity = 2 };
+    Test.Equal(1, ImportMerge.Plan([correctedRow], [existingRow]).Replacements.Count, "corrected quantity is flagged for replacement");
+    var duplicateActualSale = importRow with { Identity = "invoice:2", ImportKey = "file:11" };
+    Test.Equal(1, ImportMerge.Plan([importRow, duplicateActualSale], [existingRow]).Added.Count, "two real identical sales retain their multiplicity");
+    Test.Equal(2, ImportMerge.Plan([importRow, duplicateActualSale], [existingRow, existingRow with { Id = "saved-2", Identity = duplicateActualSale.Identity }]).Matched.Count, "reimport preserves two identical real sales without duplication");
+    var reorderedRow = overlappingRow with { Identity = "invoice:2" };
+    Test.Equal(1, ImportMerge.Plan([reorderedRow], [existingRow]).Matched.Count, "row order changes do not duplicate identical content in a bill");
 
     var unknownItem = new CatalogItem { Code = "999001", Name = "کالای بی‌برند" };
     var pendingSale = new Sale { Id = "sale-pending", Date = "14050702", Code = unknownItem.Code, Customer = "مشتری", Quantity = 2, UnitPrice = 500_000m, Total = 1_000_000m, Deductions = 0 };
@@ -185,6 +229,10 @@ public static void Main()
     var dbPath = System.IO.Path.Combine(root, "monthly-profit.sqlite");
     var store = new Store(dbPath);
     store.Save(new Month { Key = "1405/06" });
+    store.SaveLedger(ledger);
+    store.SaveLedger(offerLedger);
+    Test.Equal(1, store.LoadLedger().Offers.Count, "offers survive database roundtrip");
+    Test.Equal("11", store.LoadLedger().Sales.Single().InvoiceNumber, "invoice metadata survives database roundtrip");
     store.SaveLedger(ledger);
     Test.Equal("1405/06", new Store(dbPath).Load("1405/06").Key, "stored month opens after schema initialization");
     Test.Equal(1, new Store(dbPath).LoadLedger().Sales.Count, "stored sales ledger");

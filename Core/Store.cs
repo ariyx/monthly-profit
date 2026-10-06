@@ -43,7 +43,9 @@ public sealed class Store
     public void SaveLedger(Ledger ledger)
     {
         LedgerCalculator.Calculate(ledger);
-        var keys = ledger.Sales.Select(x => Rules.MonthOf(x.Date)).Distinct().ToList();
+        var keys = ledger.Sales.Select(x => Rules.MonthOf(x.Date))
+            .Concat(ledger.Returns.Select(x => Rules.MonthOf(x.Date)))
+            .Concat(ledger.Offers.Select(x => Rules.MonthOf(x.Date))).Distinct().ToList();
         using var c = Open(); using var tx = c.BeginTransaction(); using var cmd = c.CreateCommand(); cmd.Transaction = tx;
         cmd.CommandText = "UPDATE app_state SET data=$data WHERE id=1"; cmd.Parameters.AddWithValue("$data", JsonSerializer.Serialize(ledger, Rules.Json));
         if (cmd.ExecuteNonQuery() != 1) throw new InvalidOperationException("ذخیره دفتر تراکنش‌ها انجام نشد.");

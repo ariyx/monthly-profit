@@ -46,7 +46,7 @@ public sealed class BrandEditorDialog : Window
         {
             TextBox PercentField(string label, decimal amount) { body.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, amount); body.Children.Add(input); return input; }
             purchaseDiscount = PercentField("تخفیف خرید ٪", monthlyRate.PurchaseDiscount);
-            offer = PercentField("آفر خرید ٪", monthlyRate.Offer);
+            offer = PercentField("آفر ٪", monthlyRate.Offer);
             markup = PercentField("مارک‌آپ ٪", monthlyRate.Markup);
             cashShare = PercentField("سهم نقدی ٪", monthlyRate.CashShare);
             creditShare = PercentField("سهم چکی ٪", monthlyRate.CreditShare);
@@ -93,7 +93,7 @@ public sealed class BrandAssignmentDialog : Window
             rates.Children.Add(DialogUi.Label(label)); var input = DialogUi.Input(); DialogUi.Percent(input, value); rates.Children.Add(input); return input;
         }
         var purchaseDiscount = PercentField("تخفیف خرید ٪", 0);
-        var offer = PercentField("آفر خرید ٪", 0);
+        var offer = PercentField("آفر ٪", 0);
         var markup = PercentField("مارک‌آپ ٪", .04m);
         var cashShare = PercentField("سهم نقدی ٪", .30m);
         var creditShare = PercentField("سهم چکی ٪", .70m);
@@ -220,7 +220,13 @@ public sealed class SaleEditorDialog : Window
         var next = rate is null ? raw : BrandMonthRules.Apply(raw, rate, month);
         Rules.Validate(next); return next;
     }
-    static string Preview(Sale sale) { if (!Rules.HasRateSnapshot(sale)) return "این فروش تا تعیین برند و تأیید درصدهای ماه، در محاسبه سود وارد نمی‌شود."; var value = LedgerCalculator.PreviewSale(sale); return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال"; }
+    string Preview(Sale sale)
+    {
+        if (!Rules.HasRateSnapshot(sale)) return "این فروش تا تعیین برند و تأیید درصدهای ماه، در محاسبه سود وارد نمی‌شود.";
+        var staged = ledger with { Sales = ledger.Sales.Select(x => x.Id == sale.Id ? sale : x).ToList() };
+        var value = LedgerCalculator.Calculate(staged).Sales[sale.Id];
+        return $"قیمت خرید اولیهٔ تخمینی واحد: {Rules.ReportMoney(value.GrossPurchaseUnit)} ریال\nهزینه خالص تخمینی واحد: {Rules.ReportMoney(value.NetCostUnit)} ریال\nدریافتی واقعی پس از برگشت و آفر: {Rules.ReportMoney(value.Sales)} ریال\nهزینه کل: {Rules.ReportMoney(value.Cost)} ریال ({(value.HasManualCost ? "دستی" : "خودکار")})\nسود خالص این فروش: {Rules.ReportMoney(value.Profit)} ریال";
+    }
 }
 
 public sealed class FixedExpensesDialog : Window

@@ -6,9 +6,17 @@ using System.Xml.Linq;
 
 namespace Profit.Core;
 
-public sealed record ImportedTransaction(int Row, string ImportKey, string Date, string Code, string Name, string Account, decimal Quantity, decimal UnitPrice, decimal Total, decimal Deductions);
+public sealed record ImportedTransaction(int Row, string ImportKey, string Date, string Code, string Name, string Account, decimal Quantity, decimal UnitPrice, decimal Total, decimal Deductions)
+{
+    public string InvoiceNumber { get; init; } = "";
+    public string Identity { get; init; } = "";
+    public string Fingerprint { get; init; } = "";
+}
 public sealed record ImportIssue(int Row, string Message);
-public sealed record TransactionImportReview(List<ImportedTransaction> Rows, List<ImportIssue> Issues, int Ignored);
+public sealed record TransactionImportReview(List<ImportedTransaction> Rows, List<ImportIssue> Issues, int Ignored)
+{
+    public List<ImportedTransaction> Offers { get; init; } = [];
+}
 
 public static class TransactionImport
 {
@@ -22,7 +30,8 @@ public static class TransactionImport
         if (size > 90_000_000) throw new InvalidDataException("حداکثر حجم فایل ۹۰ مگابایت است.");
         var sourceRows = Path.GetExtension(file).Equals(".xls", StringComparison.OrdinalIgnoreCase) ? ReadSpreadsheetMl(file) : ReadXlsx(file);
         if (sourceRows.Count == 0) throw new InvalidDataException("فایل اکسل ردیفی ندارد.");
-        var hash = Hash(file); var valid = new List<ImportedTransaction>(); var issues = new List<ImportIssue>(); var ignored = 0;
+        var hash = Hash(file); var valid = new List<ImportedTransaction>(); var offers = new List<ImportedTransaction>(); var issues = new List<ImportIssue>(); var ignored = 0;
+        var occurrences = new Dictionary<string, int>(StringComparer.Ordinal);
         foreach (var (number, cells) in sourceRows)
         {
             try
@@ -33,19 +42,28 @@ public static class TransactionImport
                 if (string.IsNullOrWhiteSpace(unitText)) { ignored++; continue; }
                 var quantity = Rules.Number(string.IsNullOrWhiteSpace(Value("تعداد واحد اصلی")) ? Value("تعداد") : Value("تعداد واحد اصلی"));
                 var unit = Rules.Number(unitText); var total = string.IsNullOrWhiteSpace(totalText) ? quantity * unit : Rules.Number(totalText);
-                if (unit == 1) { ignored++; continue; }
                 var date = Rules.Digits(Value("تاریخ")); var code = Rules.Normalize(Value("کد کالا")); var name = Rules.Normalize(Value("نام کالا"));
                 var account = Rules.Normalize(Value("نام حساب"));
                 var deductionsText = Value("کسورات"); var deductions = string.IsNullOrWhiteSpace(deductionsText) ? 0m : Rules.Number(deductionsText);
                 if (!Rules.ValidDate(date) || string.IsNullOrWhiteSpace(code) || string.IsNullOrWhiteSpace(name) || quantity <= 0 || total - deductions < 0) throw new InvalidDataException("ستون‌های اجباری ردیف نامعتبر هستند.");
-                valid.Add(new ImportedTransaction(number, hash + ":" + number, date, code, name, account, quantity, unit, total, deductions));
+                if (unit <= 0 || deductions < 0) throw new InvalidDataException("قیمت یا کسورات نامعتبر است.");
+                var invoice = Rules.Digits(Value("شماره"));
+                if (unit == 1 && OfferRules.IsPromotional(name + " " + Value("شرح"))) { ignored++; continue; }
+                var group = System.Text.Json.JsonSerializer.Serialize(new[] { invoice, date, Rules.MatchText(account).ToUpperInvariant(), code.ToUpperInvariant(), unit == 1 ? "offer" : "paid" });
+                var occurrence = occurrences.GetValueOrDefault(group) + 1; occurrences[group] = occurrence;
+                var fingerprint = ImportMerge.Fingerprint(date, code, account, quantity, unit, total, deductions);
+                // Without an invoice identifier, only exact repeated content can be identified safely.
+                var identity = invoice.Length == 0 ? group + ":" + fingerprint + ":" + occurrence : group + ":" + occurrence;
+                var transaction = new ImportedTransaction(number, hash + ":" + number, date, code, name, account, quantity, unit, total, deductions)
+                { InvoiceNumber = invoice, Identity = identity, Fingerprint = fingerprint };
+                if (unit == 1) offers.Add(transaction); else valid.Add(transaction);
             }
             catch (Exception ex) when (ex is FormatException or InvalidDataException or OverflowException)
             {
                 issues.Add(new ImportIssue(number, ex.Message));
             }
         }
-        return new(valid, issues, ignored);
+        return new(valid, issues, ignored) { Offers = offers };
     }
 
     static string Hash(string file)
