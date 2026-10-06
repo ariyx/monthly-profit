@@ -1,4 +1,6 @@
+using System.ComponentModel;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -7,43 +9,76 @@ using Profit.Core;
 
 namespace Profit.Desktop;
 
-public sealed class BrandMonthConfirmationDialog : Window
+public sealed class BrandMonthConfirmationDialog : BrandDialogShell
 {
-    sealed class RateRow
+    public sealed class RateRow : INotifyPropertyChanged
     {
-        public string BrandName { get; set; } = "";
-        public string PurchaseDiscount { get; set; } = "0";
-        public string Offer { get; set; } = "0";
-        public string Markup { get; set; } = "0";
-        public string CashShare { get; set; } = "0";
-        public string CreditShare { get; set; } = "0";
-        public string CashDiscount { get; set; } = "0";
-        public static RateRow From(BrandRate rate) => new() { BrandName = rate.BrandName, PurchaseDiscount = P(rate.PurchaseDiscount), Offer = P(rate.Offer), Markup = P(rate.Markup), CashShare = P(rate.CashShare), CreditShare = P(rate.CreditShare), CashDiscount = P(rate.CashDiscount) };
-        public BrandRate ToValue() => new() { BrandName = BrandName, PurchaseDiscount = N(PurchaseDiscount), Offer = N(Offer), Markup = N(Markup), CashShare = N(CashShare), CreditShare = N(CreditShare), CashDiscount = N(CashDiscount) };
+        string purchase = "0", offer = "0", markup = "0", cash = "30", credit = "70", discount = "5";
+        bool selected, ready;
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public string BrandName { get; private set; } = "";
+        public string Source { get; private set; } = "";
+        public string Status { get; private set; } = "";
+        public string Error { get; private set; } = "";
+        public bool HasError => Error.Length > 0;
+        public bool Selected { get => selected; set { selected = value; Changed(); } }
+        public string PurchaseDiscount { get => purchase; set => Set(ref purchase, value); }
+        public string Offer { get => offer; set => Set(ref offer, value); }
+        public string Markup { get => markup; set => Set(ref markup, value); }
+        public string CashShare { get => cash; set => Set(ref cash, value); }
+        public string CreditShare { get => credit; set => Set(ref credit, value); }
+        public string CashDiscount { get => discount; set => Set(ref discount, value); }
+        void Changed([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        void Set(ref string field, string value, [CallerMemberName] string? name = null)
+        {
+            field = value; if (ready) { Selected = true; Status = "ویرایش ثبت‌نشده"; Changed(nameof(Status)); }
+            try { ToValue(); Error = ""; } catch (Exception ex) { Error = ex.Message; }
+            Changed(name); Changed(nameof(Error)); Changed(nameof(HasError));
+        }
+        public static RateRow From(BrandRate r) => new()
+        {
+            BrandName = r.BrandName, Source = r.SourceMonthKey, Status = r.IsConfirmed == true ? "تأیید شده" : "نیازمند تأیید",
+            purchase = P(r.PurchaseDiscount), offer = P(r.Offer), markup = P(r.Markup), cash = P(r.CashShare), credit = P(r.CreditShare), discount = P(r.CashDiscount),
+            selected = r.IsConfirmed != true, ready = true
+        };
         static string P(decimal value) => (value * 100m).ToString("0.##", CultureInfo.InvariantCulture);
-        static decimal N(string value) => Rules.Number(value) / 100m;
+        decimal Read(string text, string label, bool isMarkup = false)
+        {
+            try { var value = Rules.Number(text) / 100m; if (value < 0 || (!isMarkup && value > 1)) throw new FormatException(); return value; }
+            catch { throw new FormatException(label + ": " + (isMarkup ? "عدد نامنفی وارد کنید." : "عدد بین صفر و ۱۰۰ وارد کنید.")); }
+        }
+        public BrandRate ToValue()
+        {
+            var rate = new BrandRate { BrandName = BrandName, PurchaseDiscount = Read(purchase, "تخفیف خرید"), Offer = Read(offer, "آفر"), Markup = Read(markup, "مارک‌آپ", true), CashShare = Read(cash, "سهم نقدی"), CreditShare = Read(credit, "سهم چکی"), CashDiscount = Read(discount, "تخفیف نقدی") };
+            BrandMonthRules.Validate(rate); return rate;
+        }
     }
 
-    readonly List<RateRow> rows;
-    public List<BrandRate>? Value { get; private set; }
-
-    public BrandMonthConfirmationDialog(BrandMonthSettings draft)
+    public BrandMonthConfirmationDialog(Ledger ledger, string month, Action<Ledger> validate, Action<Ledger, string> commit)
+        : base(ledger, $"درصدهای برندها · {month}", "فقط ردیف‌های تیک‌خورده ثبت می‌شوند. ویرایش یک ردیف آن را انتخاب می‌کند؛ تأیید برندهای دیگر حفظ می‌شود.", validate, commit, 1140, 700)
     {
-        rows = draft.Rates.OrderBy(x => x.BrandName, StringComparer.OrdinalIgnoreCase).Select(RateRow.From).ToList();
-        Title = $"تأیید تنظیمات برندهای {draft.MonthKey}";
-        Width = 1120; Height = 650; MinWidth = 860; MinHeight = 480; WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        FlowDirection = FlowDirection.LeftToRight; FontFamily = (FontFamily)Application.Current.FindResource("Vazir");
-        var root = new Grid(); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); root.RowDefinitions.Add(new RowDefinition()); root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Content = root;
-        root.Children.Add(DialogUi.Header($"تأیید درصدهای برند در ماه {draft.MonthKey}", $"مقادیر از «{draft.SourceMonthKey}» برای شروع پر شده‌اند. مارک‌آپ جدول، پایه روز اول ماه است؛ بازه‌های وسط ماه و مارک‌آپ مخصوص فروش حفظ می‌شوند."));
-        var body = new Grid { Margin = new Thickness(22, 18, 22, 12) }; body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); body.RowDefinitions.Add(new RowDefinition()); body.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); Grid.SetRow(body, 1); root.Children.Add(body);
-        body.Children.Add(new TextBlock { Text = "همه اعداد درصد هستند. جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.", Foreground = new SolidColorBrush(Color.FromRgb(84, 98, 124)), FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 0, 0, 10) });
-        var grid = new DataGrid { AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false, CanUserDeleteRows = false, ItemsSource = rows, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, MinHeight = 160 };
-        DataGridTextColumn Column(string header, string path, double width, bool readOnly = false) => new() { Header = header, Binding = new Binding(path) { Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.LostFocus }, Width = new DataGridLength(width, DataGridLengthUnitType.Star), IsReadOnly = readOnly };
-        grid.Columns.Add(Column("برند", nameof(RateRow.BrandName), 1.45, true)); grid.Columns.Add(Column("تخفیف خرید ٪", nameof(RateRow.PurchaseDiscount), 1)); grid.Columns.Add(Column("آفر ٪", nameof(RateRow.Offer), .75)); grid.Columns.Add(Column("مارک‌آپ ٪", nameof(RateRow.Markup), .85)); grid.Columns.Add(Column("سهم نقدی ٪", nameof(RateRow.CashShare), .9)); grid.Columns.Add(Column("سهم چکی ٪", nameof(RateRow.CreditShare), .9)); grid.Columns.Add(Column("تخفیف نقدی ٪", nameof(RateRow.CashDiscount), 1));
-        Grid.SetRow(grid, 1); body.Children.Add(grid);
-        var error = new TextBlock { Foreground = Brushes.Firebrick, TextWrapping = TextWrapping.Wrap, FlowDirection = FlowDirection.RightToLeft, TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 10, 0, 0) }; Grid.SetRow(error, 2); body.Children.Add(error);
-        var footer = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(22, 0, 22, 18) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
-        var confirm = new Button { Content = $"تأیید تنظیمات {draft.MonthKey}", Style = (Style)FindResource("Primary") }; footer.Children.Add(confirm); footer.Children.Add(new Button { Content = "فعلاً تأیید نمی‌کنم", IsCancel = true });
-        confirm.Click += (_, _) => { try { grid.CommitEdit(DataGridEditingUnit.Cell, true); grid.CommitEdit(DataGridEditingUnit.Row, true); var values = rows.Select(x => x.ToValue()).ToList(); foreach (var value in values) BrandMonthRules.Validate(value); Value = values; DialogResult = true; } catch (Exception ex) { error.Text = ex.Message; } };
+        var active = ledger.Brands.Where(b => b.IsActive).Select(b => b.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rows = BrandMonthRules.DraftFor(ledger, month).Rates.Where(r => active.Contains(r.BrandName)).OrderBy(r => r.BrandName).Select(RateRow.From).ToList();
+        var grid = new DataGrid { ItemsSource = rows, AutoGenerateColumns = false, IsReadOnly = false, CanUserAddRows = false, CanUserDeleteRows = false, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Form.Children.Add(grid);
+        grid.Columns.Add(new DataGridCheckBoxColumn { Header = "ثبت", Binding = new Binding(nameof(RateRow.Selected)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, Width = 60 });
+        void Column(string title, string path, bool readOnly = false, double width = 115) => grid.Columns.Add(new DataGridTextColumn { Header = title, Binding = new Binding(path) { Mode = readOnly ? BindingMode.OneWay : BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged }, IsReadOnly = readOnly, Width = width });
+        Column("برند", nameof(RateRow.BrandName), true, 150); Column("وضعیت", nameof(RateRow.Status), true); Column("منبع", nameof(RateRow.Source), true);
+        Column("تخفیف خرید ٪", nameof(RateRow.PurchaseDiscount)); Column("آفر ٪", nameof(RateRow.Offer)); Column("مارک‌آپ پایه ٪", nameof(RateRow.Markup)); Column("سهم نقدی ٪", nameof(RateRow.CashShare)); Column("سهم چکی ٪", nameof(RateRow.CreditShare)); Column("تخفیف نقدی ٪", nameof(RateRow.CashDiscount)); Column("خطای ردیف", nameof(RateRow.Error), true, 260);
+        var rowStyle = new Style(typeof(DataGridRow), Application.Current.TryFindResource(typeof(DataGridRow)) as Style);
+        var errorTrigger = new DataTrigger { Binding = new Binding(nameof(RateRow.HasError)), Value = true }; errorTrigger.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.MistyRose)); rowStyle.Triggers.Add(errorTrigger); grid.RowStyle = rowStyle;
+        ReadChange = () =>
+        {
+            grid.CommitEdit(DataGridEditingUnit.Cell, true); grid.CommitEdit(DataGridEditingUnit.Row, true);
+            var values = new List<BrandRate>();
+            foreach (var row in rows.Where(r => r.Selected))
+            {
+                try { values.Add(row.ToValue()); }
+                catch (Exception ex) { grid.SelectedItem = row; grid.ScrollIntoView(row); throw new InvalidOperationException(row.BrandName + ": " + ex.Message); }
+            }
+            return BrandMonthRules.Confirm(ledger, month, values);
+        };
+        Scope = $"فقط برندهای انتخاب‌شده در ماه {month} تأیید یا اصلاح می‌شوند؛ مارک‌آپ اختصاصی فروش و بازه‌های ثبت‌شده حفظ می‌شوند.";
+        ActionText = $"درصدهای برندهای انتخاب‌شده در {month} ثبت شد.";
     }
 }

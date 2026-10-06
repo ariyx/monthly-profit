@@ -38,10 +38,12 @@ public sealed class Store
         using var c = Open(); using var cmd = c.CreateCommand(); cmd.CommandText = "SELECT data FROM app_state WHERE id=1";
         var json = cmd.ExecuteScalar() as string ?? throw new InvalidDataException("دفتر تراکنش‌ها یافت نشد.");
         var ledger = JsonSerializer.Deserialize<Ledger>(json, Rules.Json) ?? throw new InvalidDataException("دفتر تراکنش‌ها نامعتبر است.");
+        ledger = MarkupRules.UpgradeLegacy(ledger);
         LedgerCalculator.Calculate(ledger); return ledger;
     }
     public void SaveLedger(Ledger ledger)
     {
+        ledger = MarkupRules.UpgradeLegacy(ledger);
         LedgerCalculator.Calculate(ledger);
         var keys = ledger.Sales.Select(x => Rules.MonthOf(x.Date))
             .Concat(ledger.Returns.Select(x => Rules.MonthOf(x.Date)))

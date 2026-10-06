@@ -36,6 +36,9 @@ public sealed record Brand
 
 public sealed record BrandRate
 {
+    public bool? IsConfirmed { get; init; }
+    public string SourceMonthKey { get; init; } = "";
+    public DateTime? ConfirmedAtUtc { get; init; }
     public string BrandName { get; init; } = "";
     public decimal PurchaseDiscount { get; init; }
     public decimal Offer { get; init; }
@@ -54,127 +57,6 @@ public sealed record BrandMonthSettings
     public List<BrandRate> Rates { get; init; } = [];
 }
 
-public static class BrandMonthRules
-{
-    public static BrandRate FromBrand(Brand brand) => new()
-    {
-        BrandName = brand.Name, PurchaseDiscount = brand.PurchaseDiscount, Offer = brand.Offer,
-        Markup = brand.Markup, CreditShare = brand.CreditShare, CashShare = brand.CashShare, CashDiscount = brand.CashDiscount
-    };
-
-    public static void Validate(BrandRate rate)
-    {
-        if (string.IsNullOrWhiteSpace(rate.BrandName) || rate.BrandName.Trim().Length > 120) throw new InvalidDataException("نام برند در تنظیمات ماهانه نامعتبر است.");
-        if (rate.Markup < 0) throw new InvalidDataException("مارک‌آپ برند نمی‌تواند منفی باشد.");
-        if (new[] { rate.PurchaseDiscount, rate.Offer, rate.CreditShare, rate.CashShare, rate.CashDiscount }.Any(x => x < 0 || x > 1)) throw new InvalidDataException("درصدهای ماهانه برند باید بین صفر و ۱۰۰ باشند.");
-        if (rate.PurchaseDiscount + rate.Offer > 1) throw new InvalidDataException("جمع تخفیف خرید و آفر نباید از ۱۰۰٪ بیشتر باشد.");
-        if (rate.CashShare + rate.CreditShare != 1) throw new InvalidDataException("جمع سهم نقدی و چکی باید دقیقاً ۱۰۰٪ باشد.");
-    }
-
-    public static BrandMonthSettings DraftFor(Ledger ledger, string monthKey)
-    {
-        if (!Rules.ValidMonth(monthKey)) throw new InvalidDataException("ماه تنظیمات برند نامعتبر است.");
-        var exact = ledger.BrandMonths.FirstOrDefault(x => x.MonthKey == monthKey);
-        if (exact != null)
-        {
-            var saved = exact.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase);
-            var rates = ledger.Brands.Select(b => saved.TryGetValue(Rules.Normalize(b.Name), out var rate) ? rate with { BrandName = b.Name } : FromBrand(b)).ToList();
-            return exact with { Rates = rates, IsConfirmed = exact.IsConfirmed && rates.Count == exact.Rates.Count };
-        }
-        var source = ledger.BrandMonths.Where(x => x.IsConfirmed && string.CompareOrdinal(x.MonthKey, monthKey) < 0).OrderByDescending(x => x.MonthKey, StringComparer.Ordinal).FirstOrDefault();
-        var previous = source?.Rates.ToDictionary(x => Rules.Normalize(x.BrandName), StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, BrandRate>(StringComparer.OrdinalIgnoreCase);
-        var draft = ledger.Brands.Select(b => previous.TryGetValue(Rules.Normalize(b.Name), out var rate)
-            ? rate with { BrandName = b.Name, Markup = MarkupRules.Resolve(ledger, b.Name, source!.MonthKey.Replace("/", "") + "31", rate.Markup) }
-            : FromBrand(b)).ToList();
-        return new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = source?.MonthKey ?? "تنظیمات پیش‌فرض", Rates = draft };
-    }
-
-    public static bool IsConfirmed(Ledger ledger, string monthKey) => DraftFor(ledger, monthKey).IsConfirmed;
-
-    public static BrandRate RequireConfirmed(Ledger ledger, string brandName, string monthKey)
-    {
-        var month = DraftFor(ledger, monthKey);
-        if (!month.IsConfirmed) throw new InvalidOperationException($"تنظیمات برندهای ماه {monthKey} هنوز تأیید نشده است.");
-        return TryConfirmed(ledger, brandName, monthKey)
-            ?? throw new InvalidOperationException($"برای برند «{brandName}» در ماه {monthKey} تنظیمی وجود ندارد.");
-    }
-
-    public static BrandRate? TryConfirmed(Ledger ledger, string brandName, string monthKey)
-    {
-        var month = DraftFor(ledger, monthKey);
-        if (!month.IsConfirmed) return null;
-        return month.Rates.FirstOrDefault(x => Rules.Normalize(x.BrandName).Equals(Rules.Normalize(brandName), StringComparison.OrdinalIgnoreCase));
-    }
-
-    public static Ledger Confirm(Ledger ledger, string monthKey, IEnumerable<BrandRate> values)
-    {
-        var rates = values.Select(x => x with { BrandName = Rules.Normalize(x.BrandName) }).ToList();
-        foreach (var rate in rates) Validate(rate);
-        var expected = ledger.Brands.Select(x => Rules.Normalize(x.Name)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
-        var actual = rates.Select(x => Rules.Normalize(x.BrandName)).OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
-        if (!expected.SequenceEqual(actual, StringComparer.OrdinalIgnoreCase) || actual.Distinct(StringComparer.OrdinalIgnoreCase).Count() != actual.Count) throw new InvalidDataException("جدول ماهانه باید دقیقاً یک ردیف برای هر برند فعال داشته باشد.");
-        var draft = DraftFor(ledger, monthKey);
-        var confirmed = new BrandMonthSettings { MonthKey = monthKey, SourceMonthKey = draft.SourceMonthKey, IsConfirmed = true, ConfirmedAtUtc = DateTime.UtcNow, Rates = rates };
-        var staged = ledger with { BrandMonths = [.. ledger.BrandMonths.Where(x => x.MonthKey != monthKey), confirmed] };
-        var items = staged.Items.ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var sales = staged.Sales.Select(sale =>
-        {
-            if (Rules.MonthOf(sale.Date) != monthKey) return sale;
-            if (!items.TryGetValue(sale.Code, out var item)) throw new InvalidDataException($"کالای کد {sale.Code} یافت نشد.");
-            // فروشِ کالای بی‌برند در دفتر باقی می‌ماند، اما تا زمان تعیین برند محاسبه نمی‌شود.
-            if (string.IsNullOrWhiteSpace(item.Brand)) return sale;
-            return Apply(sale, RequireConfirmed(staged, item.Brand, monthKey), monthKey, staged);
-        }).ToList();
-        return staged with { Sales = sales };
-    }
-
-    // پس از تعیین برندِ یک کد ناشناخته، فروش‌های معلقِ ماه‌های تأییدشده همان کد Snapshot می‌گیرند.
-    public static Ledger ApplyPendingSalesForItem(Ledger ledger, string code)
-    {
-        var item = ledger.Items.FirstOrDefault(x => x.Code.Equals(code, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidDataException($"کالای کد {code} یافت نشد.");
-        if (string.IsNullOrWhiteSpace(item.Brand)) return ledger;
-        var sales = ledger.Sales.Select(sale =>
-        {
-            if (!sale.Code.Equals(code, StringComparison.OrdinalIgnoreCase) || HasSnapshot(sale)) return sale;
-            var monthKey = Rules.MonthOf(sale.Date);
-            var rate = TryConfirmed(ledger, item.Brand, monthKey);
-            return rate is null ? sale : Apply(sale, rate, monthKey, ledger);
-        }).ToList();
-        return ledger with { Sales = sales };
-    }
-
-    public static Ledger ApplyExactProductCodeAssignments(Ledger ledger)
-    {
-        var exactBrands = ledger.Items.Select(item => (Item: item, Brand: BrandPrefixRules.DetectExact(ledger.Brands.Where(b => b.IsActive), item.Code)))
-            .Where(x => x.Brand is not null && !Rules.Normalize(x.Item.Brand).Equals(Rules.Normalize(x.Brand!.Name), StringComparison.OrdinalIgnoreCase))
-            .ToDictionary(x => x.Item.Code, x => x.Brand!.Name, StringComparer.OrdinalIgnoreCase);
-        if (exactBrands.Count == 0) return ledger;
-
-        var staged = ledger with { Items = ledger.Items.Select(item => exactBrands.TryGetValue(item.Code, out var brand) ? item with { Brand = brand } : item).ToList() };
-        var sales = staged.Sales.Select(sale =>
-        {
-            if (!exactBrands.TryGetValue(sale.Code, out var brand)) return sale;
-            var monthKey = Rules.MonthOf(sale.Date);
-            var rate = TryConfirmed(staged, brand, monthKey);
-            return rate is null ? sale with
-            {
-                CashShare = 0, CreditShare = 0, CashDiscount = 0, PurchaseDiscount = 0, Offer = 0, Markup = 0, RateMonthKey = "",
-                EstimatedCostOverride = null, EstimatedCostOverrideNote = ""
-            } : Apply(sale, rate, monthKey, staged);
-        }).ToList();
-        return staged with { Sales = sales };
-    }
-
-    static bool HasSnapshot(Sale sale) => Rules.HasRateSnapshot(sale);
-
-    public static Sale Apply(Sale sale, BrandRate rate, string monthKey, Ledger? ledger = null) => sale with
-    {
-        CashShare = rate.CashShare, CreditShare = rate.CreditShare, CashDiscount = rate.CashDiscount,
-        PurchaseDiscount = rate.PurchaseDiscount, Offer = rate.Offer,
-        Markup = sale.MarkupOverride ?? (ledger is null ? rate.Markup : MarkupRules.Resolve(ledger, rate.BrandName, sale.Date, rate.Markup)), RateMonthKey = monthKey
-    };
-}
 
 public static class BrandPrefixRules
 {
@@ -330,7 +212,25 @@ public static class Rules
     public static string ReportMoney(decimal n) => decimal.Round(n, 0, MidpointRounding.AwayFromZero).ToString("#,##0", CultureInfo.InvariantCulture);
     public static string Percent(decimal? n) => n.HasValue ? (n.Value * 100).ToString("0.##", CultureInfo.InvariantCulture) + "٪" : "تعریف‌نشده";
     public static bool ValidMonth(string key) => key.Length == 7 && key[4] == '/' && int.TryParse(key[..4], out var y) && y is >= 1300 and <= 1600 && int.TryParse(key[5..], out var m) && m is >= 1 and <= 12;
-    public static bool ValidDate(string value) => value.Length == 8 && value.All(char.IsDigit) && ValidMonth(value[..4] + "/" + value[4..6]) && int.TryParse(value[6..], out var day) && day is >= 1 and <= 31;
+    public static bool ValidDate(string value)
+    {
+        if (value.Length != 8 || !value.All(char.IsDigit) || !ValidMonth(value[..4] + "/" + value[4..6]) || !int.TryParse(value[6..], out var day)) return false;
+        var calendar = new PersianCalendar();
+        return day >= 1 && day <= calendar.GetDaysInMonth(int.Parse(value[..4], CultureInfo.InvariantCulture), int.Parse(value[4..6], CultureInfo.InvariantCulture));
+    }
+    public static string LastDate(string month)
+    {
+        if (!ValidMonth(month)) throw new InvalidDataException("ماه نامعتبر است.");
+        var days = new PersianCalendar().GetDaysInMonth(int.Parse(month[..4], CultureInfo.InvariantCulture), int.Parse(month[5..], CultureInfo.InvariantCulture));
+        return month.Replace("/", "") + days.ToString("00", CultureInfo.InvariantCulture);
+    }
+    public static string PreviousDate(string date)
+    {
+        if (!ValidDate(date)) throw new InvalidDataException("تاریخ نامعتبر است.");
+        var calendar = new PersianCalendar();
+        var previous = calendar.ToDateTime(int.Parse(date[..4], CultureInfo.InvariantCulture), int.Parse(date[4..6], CultureInfo.InvariantCulture), int.Parse(date[6..], CultureInfo.InvariantCulture), 0, 0, 0, 0).AddDays(-1);
+        return $"{calendar.GetYear(previous):0000}{calendar.GetMonth(previous):00}{calendar.GetDayOfMonth(previous):00}";
+    }
     public static string MonthOf(string date) { date = Digits(date); if (!ValidDate(date)) throw new InvalidDataException("تاریخ باید مانند 14050421 باشد."); return date[..4] + "/" + date[4..6]; }
     public static decimal NetSaleBase(Sale sale) => sale.Total - sale.Deductions;
     public static decimal ReturnNetBase(SaleReturn saleReturn) => saleReturn.Total - saleReturn.Deductions;
