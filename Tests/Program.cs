@@ -222,6 +222,57 @@ public static void Main()
     var legacyWithNewBrand = BrandCatalogRules.Upsert(legacyApproval, extraBrand);
     Test.True(BrandMonthRules.TryConfirmed(legacyWithNewBrand, fikores.Name, "1405/06") is not null && BrandMonthRules.TryConfirmed(legacyWithNewBrand, extraBrand.Name, "1405/06") is null, "legacy monthly approval applies only to saved brand rows");
     var unknown1 = new CatalogItem { Code = "8880011", Name = "Unknown 1" };
+    var carryLedger = new Ledger { Brands = [fikores, extraBrand] };
+    carryLedger = BrandMonthRules.Confirm(carryLedger, "1405/01", [BrandMonthRules.FromBrand(fikores) with { Markup = .40m }, BrandMonthRules.FromBrand(extraBrand)]);
+    // Approving another brand persists an unconfirmed February draft for Fikores.
+    carryLedger = BrandMonthRules.Confirm(carryLedger, "1405/02", [BrandMonthRules.FromBrand(extraBrand)]);
+    Test.Equal(.40m, BrandMonthRules.DraftFor(carryLedger, "1405/02").Rates.Single(r => r.BrandName == fikores.Name).Markup, "initial next-month default");
+    var januaryPeriod = new MarkupPeriod { Id = "january-carry", BrandName = fikores.Name, StartDate = "14050115", EndDate = "14050131", Markup = .60m };
+    var januaryChanged = MarkupRules.SetPeriod(carryLedger, januaryPeriod, false);
+    var februaryDraft = BrandMonthRules.DraftFor(januaryChanged, "1405/02").Rates.Single(r => r.BrandName == fikores.Name);
+    Test.Equal(.60m, februaryDraft.Markup, "last-day markup refreshes previously persisted unconfirmed next-month default");
+    Test.Equal("1405/01", februaryDraft.SourceMonthKey, "carried markup keeps its source month");
+    Test.True(februaryDraft.IsConfirmed != true, "automatic carry still requires month approval");
+    var marchDraft = BrandMonthRules.DraftFor(januaryChanged, "1405/03").Rates.Single(r => r.BrandName == fikores.Name);
+    Test.Equal(.60m, marchDraft.Markup, "unconfirmed intervening month does not lose latest approved markup");
+    var februaryApproved = BrandMonthRules.Confirm(januaryChanged, "1405/02", [februaryDraft]);
+    Test.Equal(.60m, BrandMonthRules.DraftFor(februaryApproved, "1405/03").Rates.Single(r => r.BrandName == fikores.Name).Markup, "carried base continues into subsequent month");
+    var januaryRevised = MarkupRules.SetPeriod(februaryApproved, januaryPeriod with { Markup = .80m }, true);
+    Test.Equal(.60m, BrandMonthRules.RequireConfirmed(januaryRevised, fikores.Name, "1405/02").Markup, "already-approved next month stays fixed");
+    var februaryRevised = BrandMonthRules.Confirm(februaryApproved, "1405/02", [februaryDraft with { Markup = .90m }]);
+    Test.Equal(.90m, BrandMonthRules.DraftFor(februaryRevised, "1405/03").Rates.Single(r => r.BrandName == fikores.Name).Markup, "new month-specific change becomes following default");
+    var decemberLedger = BrandMonthRules.Confirm(new Ledger { Brands = [fikores] }, "1405/12", [BrandMonthRules.FromBrand(fikores)]);
+    decemberLedger = MarkupRules.SetPeriod(decemberLedger, new MarkupPeriod { BrandName = fikores.Name, StartDate = "14051215", EndDate = Rules.LastDate("1405/12"), Markup = 1.20m }, false);
+    Test.Equal(1.20m, BrandMonthRules.DraftFor(decemberLedger, "1406/01").Rates.Single().Markup, "actual Esfand final day carries across year boundary");
+
+    var logTime = new DateTime(2026, 10, 8, 9, 50, 0, DateTimeKind.Utc);
+    Test.Equal(0, januaryChanged.BrandChanges.Count, "staging a range does not write audit history");
+    var januaryLogged = BrandChangeHistory.Append(carryLedger, januaryChanged, logTime);
+    var addedLog = januaryLogged.BrandChanges.Single();
+    Test.Equal(logTime, addedLog.AtUtc, "audit records commit time independently of effective start");
+    Test.Equal("1405/01", addedLog.MonthKey, "range audit belongs to affected month");
+    Test.True(addedLog.Details.Contains("14050115 تا 14050131") && addedLog.Details.Contains("40٪") && addedLog.Details.Contains("60٪"), "added range audit includes prior markup and new effective range");
+    var januaryLoggedEdit = BrandChangeHistory.Append(januaryLogged, MarkupRules.SetPeriod(januaryLogged, januaryPeriod with { Markup = .75m, StartDate = "14050116" }, true), logTime.AddMinutes(1));
+    Test.Equal(2, januaryLoggedEdit.BrandChanges.Count, "range correction appends without replacing older history");
+    Test.True(januaryLoggedEdit.BrandChanges.Last().Details.Contains("قبل: 14050115") && januaryLoggedEdit.BrandChanges.Last().Details.Contains("بعد: 14050116") && januaryLoggedEdit.BrandChanges.Last().Details.Contains("75٪"), "correction records both dates and percentages");
+    var januaryLoggedDelete = BrandChangeHistory.Append(januaryLoggedEdit, MarkupRules.RemovePeriod(januaryLoggedEdit, januaryPeriod.Id), logTime.AddMinutes(2));
+    Test.Equal("حذف بازه مارک‌آپ", januaryLoggedDelete.BrandChanges.Last().Action, "deletion creates its own audit record");
+    Test.Equal(3, januaryLoggedDelete.BrandChanges.Count, "deletion retains full previous history");
+    Test.Equal(3, BrandChangeHistory.Append(januaryLoggedDelete, januaryLoggedDelete).BrandChanges.Count, "unchanged commit creates no duplicate audit");
+    Test.Equal(0, BrandChangeHistory.ForMonth(januaryLoggedDelete, "1405/02").Count(), "audit view excludes other months");
+    Test.Equal(0, BrandChangeHistory.ForMonth(januaryLoggedDelete, "1405/01", extraBrand.Name).Count(), "brand-specific audit excludes other brands");
+    Test.Equal("حذف بازه مارک‌آپ", BrandChangeHistory.ForMonth(januaryLoggedDelete, "1405/01", fikores.Name).First().Action, "audit displays newest commit first");
+    var inheritedApproval = BrandChangeHistory.Append(januaryLogged, BrandMonthRules.Confirm(januaryLogged, "1405/02", [BrandMonthRules.DraftFor(januaryLogged, "1405/02").Rates.Single(r => r.BrandName == fikores.Name)]), logTime.AddMinutes(3));
+    var approvalLog = BrandChangeHistory.ForMonth(inheritedApproval, "1405/02").Single();
+    Test.True(approvalLog.Details.Contains("60٪") && approvalLog.Details.Contains("1405/01"), "next-month approval records inherited source and markup");
+    var editedBase = BrandMonthRules.Confirm(inheritedApproval, "1405/02", [BrandMonthRules.RequireConfirmed(inheritedApproval, fikores.Name, "1405/02") with { Markup = .85m }]);
+    var editedBaseLog = BrandChangeHistory.Append(inheritedApproval, editedBase, logTime.AddMinutes(4));
+    Test.True(editedBaseLog.BrandChanges.Last().Details.Contains("60٪") && editedBaseLog.BrandChanges.Last().Details.Contains("85٪"), "base markup audit retains before and after values");
+    var legacyHistory = januaryLogged with { BrandMonths = januaryLogged.BrandMonths.Select(m => m.MonthKey == "1405/01" ? m with { Rates = m.Rates.Select(r => r with { IsConfirmed = null }).ToList() } : m).ToList() };
+    var legacyHistoryNormalization = legacyHistory with { BrandMonths = legacyHistory.BrandMonths.Select(m => m with { Rates = m.Rates.Select(r => r with { IsConfirmed = r.IsConfirmed ?? m.IsConfirmed }).ToList() }).ToList() };
+    Test.Equal(januaryLogged.BrandChanges.Count, BrandChangeHistory.Append(legacyHistory, legacyHistoryNormalization).BrandChanges.Count, "confirmation normalization is not logged as a user edit");
+    var olderHistoryDefaults = System.Text.Json.JsonSerializer.Deserialize<Ledger>("{\"Brands\":[]}", Rules.Json)!;
+    Test.Equal(0, olderHistoryDefaults.BrandChanges.Count, "old ledger defaults to empty history");
     var unknown2 = new CatalogItem { Code = "8880012", Name = "Unknown 2" };
     var unknowns = ledger with { Items = [.. ledger.Items, unknown1, unknown2], Sales = [sale with { Id = "unknown-pending", Code = unknown1.Code, RateMonthKey = "", CashShare = 0, CreditShare = 0 }] };
     var assignedUnknowns = BrandCatalogRules.Upsert(unknowns, extraBrand);
@@ -234,6 +285,38 @@ public static void Main()
     var discardedPreview = MarkupRules.SetPeriod(timelineLedger, firstPeriod with { Markup = 2m }, true);
     Test.Equal(originalJson, System.Text.Json.JsonSerializer.Serialize(timelineLedger, Rules.Json), "staged preview does not mutate original ledger");
     Test.True(BrandChangePreview.Describe(timelineLedger, discardedPreview, "preview").Contains("تغییر بهای تمام‌شده"), "preview includes cost and profit impact");
+
+    // Older confirmed months have no per-brand confirmation flag. A range-only edit
+    // must not report every saved brand as a monthly percentage change.
+    var legacyPreview = independent with
+    {
+        MarkupPeriods = [],
+        BrandMonths = independent.BrandMonths.Select(m => m with { Rates = m.Rates.Select(r => r with { IsConfirmed = null }).ToList() }).ToList()
+    };
+    legacyPreview = legacyPreview with { Sales = legacyPreview.Sales.Select(s => BrandMonthRules.Apply(s,
+        BrandMonthRules.RequireConfirmed(legacyPreview, legacyPreview.Items.Single(i => i.Code == s.Code).Brand, Rules.MonthOf(s.Date)),
+        Rules.MonthOf(s.Date), legacyPreview)).ToList() };
+    var previewPeriod = new MarkupPeriod { Id = "legacy-preview-range", BrandName = fikores.Name, StartDate = "14050615", EndDate = "14050619", Markup = .90m };
+    var previewAdded = MarkupRules.SetPeriod(legacyPreview, previewPeriod, false);
+    var rangePreviewText = BrandChangePreview.Describe(legacyPreview, previewAdded, "range");
+    Test.True(!rangePreviewText.Contains(extraBrand.Name) && !rangePreviewText.Contains("مارک‌آپ پایه:"), "legacy range preview excludes unchanged brand percentages");
+    Test.True(rangePreviewText.Contains(fikores.Name) && rangePreviewText.Contains("14050615 تا 14050619") && rangePreviewText.Contains("1 فروش دارای تغییر"), "legacy range preview shows selected range and affected sales");
+    Test.Equal(legacyPreview.Sales.Single(s => s.Id == independentSale.Id), previewAdded.Sales.Single(s => s.Id == independentSale.Id), "preview fix leaves unrelated sale snapshot untouched");
+    var previewEdited = MarkupRules.SetPeriod(previewAdded, previewPeriod with { Markup = 1.20m }, true);
+    var editedPreviewText = BrandChangePreview.Describe(previewAdded, previewEdited, "range");
+    Test.True(!editedPreviewText.Contains(extraBrand.Name) && !editedPreviewText.Contains("مارک‌آپ پایه:") && editedPreviewText.Contains("بازه قبلی:"), "legacy range correction shows only range difference");
+    var previewRemoved = MarkupRules.RemovePeriod(previewAdded, previewPeriod.Id);
+    var removedPreviewText = BrandChangePreview.Describe(previewAdded, previewRemoved, "range");
+    Test.True(!removedPreviewText.Contains(extraBrand.Name) && !removedPreviewText.Contains("مارک‌آپ پایه:") && removedPreviewText.Contains("حذف بازه"), "legacy range deletion excludes unrelated brands");
+    var normalizedPreview = legacyPreview with { BrandMonths = legacyPreview.BrandMonths.Select(m => m with { Rates = m.Rates.Select(r => r with { IsConfirmed = true }).ToList() }).ToList() };
+    Test.True(!BrandChangePreview.Describe(legacyPreview, normalizedPreview, "normalization").Contains("مارک‌آپ پایه:"), "legacy confirmation normalization is not a user-facing change");
+    var genuineRateChange = BrandMonthRules.Confirm(legacyPreview, "1405/06", [BrandMonthRules.RequireConfirmed(legacyPreview, extraBrand.Name, "1405/06") with { Markup = 1.10m }]);
+    var genuineRateText = BrandChangePreview.Describe(legacyPreview, genuineRateChange, "monthly");
+    Test.True(genuineRateText.Contains(extraBrand.Name) && genuineRateText.Contains("مارک‌آپ پایه:") && !genuineRateText.Contains(fikores.Name), "genuine monthly rate change still appears for just the edited brand");
+    var legacyPending = legacyPreview with { BrandMonths = legacyPreview.BrandMonths.Select(m => m with { IsConfirmed = false }).ToList(), Sales = [] };
+    var newlyConfirmed = BrandMonthRules.Confirm(legacyPending, "1405/06", [BrandMonthRules.FromBrand(extraBrand)]);
+    var approvalPreviewText = BrandChangePreview.Describe(legacyPending, newlyConfirmed, "approval");
+    Test.True(approvalPreviewText.Contains(extraBrand.Name) && !approvalPreviewText.Contains(fikores.Name), "new approval is still visible while other legacy pending brands are omitted");
 
     var inactiveLedger = BrandLifecycle.RemoveOrDeactivate(timelineLedger, fikores.Name);
     Test.True(!inactiveLedger.Brands.Single().IsActive, "used brand is deactivated instead of deleted");
@@ -356,6 +439,9 @@ public static void Main()
 
     var dbPath = System.IO.Path.Combine(root, "monthly-profit.sqlite");
     var store = new Store(dbPath);
+    store.SaveLedger(editedBaseLog);
+    Test.Equal(editedBaseLog.BrandChanges.Count, store.LoadLedger().BrandChanges.Count, "monthly change logs survive SQLite roundtrip");
+    Test.Equal(editedBaseLog.BrandChanges.Last(), store.LoadLedger().BrandChanges.Last(), "audit commit timestamp and before/after details survive persistence");
     store.Save(new Month { Key = "1405/06" });
     store.SaveLedger(ledger);
     store.SaveLedger(offerLedger);

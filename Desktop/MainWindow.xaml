@@ -197,6 +197,7 @@
 <Button Content="+ افزودن برند" Click="AddBrand"/>
 <Button Content="تأیید درصدهای ماه" Click="ConfirmBrandMonth" Style="{StaticResource Primary}"/>
 <Button x:Name="ManageBrandButton" Content="مدیریت برند" Click="ManageBrand" IsEnabled="False"/>
+<Button Content="لاگ تغییرات ماه" Click="ShowBrandMonthHistory"/>
 </WrapPanel>
 <WrapPanel FlowDirection="RightToLeft" HorizontalAlignment="Right" Margin="0,8,0,0">
 <TextBlock Text="جست‌وجوی نام یا کد:" Style="{StaticResource MutedText}" VerticalAlignment="Center"/>

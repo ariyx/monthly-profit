@@ -33,7 +33,9 @@ public static class BrandMonthRules
         var rates = ledger.Brands.Select(b =>
         {
             var saved = exact?.Rates.FirstOrDefault(r => MarkupRules.SameBrand(r.BrandName, b.Name));
-            return saved is null ? Suggest(ledger, b, month) : saved with { BrandName = b.Name, IsConfirmed = Confirmed(saved, exact!), SourceMonthKey = saved.SourceMonthKey.Length > 0 ? saved.SourceMonthKey : exact!.SourceMonthKey };
+            // Unconfirmed rows persisted while approving another brand are still defaults.
+            // Refresh them from the latest approved source; approved months remain fixed.
+            return saved is null || !Confirmed(saved, exact!) ? Suggest(ledger, b, month) : saved with { BrandName = b.Name, IsConfirmed = true, SourceMonthKey = saved.SourceMonthKey.Length > 0 ? saved.SourceMonthKey : exact!.SourceMonthKey };
         }).ToList();
         var sources = rates.Select(r => r.SourceMonthKey).Distinct().ToList();
         return new BrandMonthSettings { MonthKey = month, Rates = rates, IsConfirmed = ledger.Brands.Where(b => b.IsActive).All(b => rates.Any(r => MarkupRules.SameBrand(r.BrandName, b.Name) && r.IsConfirmed == true)), SourceMonthKey = sources.Count == 1 ? sources[0] : "منبع جداگانه برای هر برند", ConfirmedAtUtc = exact?.ConfirmedAtUtc };

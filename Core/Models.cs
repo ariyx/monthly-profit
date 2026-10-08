@@ -167,6 +167,7 @@ public sealed record SaleReturn
 
 public sealed record Ledger
 {
+    public List<BrandChangeEntry> BrandChanges { get; init; } = [];
     public List<MarkupPeriod> MarkupPeriods { get; init; } = [];
     public List<OfferEntry> Offers { get; init; } = [];
     public bool BrandRulesInitialized { get; init; }

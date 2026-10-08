@@ -191,6 +191,10 @@ public partial class MainWindow : Window
         if (!CanEdit()) return;
         Guard(() => new BrandMonthConfirmationDialog(ledger, current.Key, ValidateBrandChange, CommitBrandChange) { Owner = this }.ShowDialog());
     }
+    void ShowBrandMonthHistory(object s, RoutedEventArgs e)
+    {
+        Guard(() => new BrandHistoryDialog(ledger, current.Key, store.Keys()) { Owner = this }.ShowDialog());
+    }
     void ValidateBrandChange(Ledger next)
     {
         next = BrandMonthRules.ApplyExactProductCodeAssignments(MarkupRules.UpgradeLegacy(next));
@@ -202,6 +206,7 @@ public partial class MainWindow : Window
     {
         next = BrandMonthRules.ApplyExactProductCodeAssignments(MarkupRules.UpgradeLegacy(next));
         ValidateBrandChange(next);
+        next = BrandChangeHistory.Append(ledger, next);
         store.SaveLedger(next); ledger = next; Guard(() => Reload(false)); Status.Text = action;
     }
 

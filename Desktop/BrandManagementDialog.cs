@@ -21,6 +21,8 @@ public sealed class BrandManagementDialog : Window
         var footer = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(22, 0, 22, 16) }; Grid.SetRow(footer, 2); root.Children.Add(footer);
         var lifecycle = new Button(); footer.Children.Add(lifecycle); footer.Children.Add(new Button { Content = "بستن", IsCancel = true });
         var currentSection = 0; var currentMonth = selectedMonth;
+        var history = new Button { Content = "لاگ تغییرات ماه" }; nav.Children.Add(history);
+        history.Click += (_, _) => new BrandHistoryDialog(getLedger(), currentMonth, months, brandName) { Owner = this }.ShowDialog();
         void Text(string value) => panel.Children.Add(new TextBlock { Text = value, Style = (Style)FindResource("MutedText"), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 8) });
         void Refresh()
         {

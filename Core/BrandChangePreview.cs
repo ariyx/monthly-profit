@@ -23,8 +23,12 @@ public static class BrandChangePreview
         foreach (var rate in month.Rates)
         {
             var old = before.BrandMonths.FirstOrDefault(m => m.MonthKey == month.MonthKey)?.Rates.FirstOrDefault(r => MarkupRules.SameBrand(r.BrandName, rate.BrandName));
-            if (old is null && rate.IsConfirmed != true) continue;
-            if (old is not null && BrandMonthRules.SameValues(old, rate) && (BrandMonthRules.TryConfirmed(before, rate.BrandName, month.MonthKey) is not null) == (rate.IsConfirmed == true)) continue;
+            // Legacy rows inherit confirmation from the month. Compare effective states on both sides.
+            var wasConfirmed = BrandMonthRules.TryConfirmed(before, rate.BrandName, month.MonthKey) is not null;
+            var isConfirmed = BrandMonthRules.TryConfirmed(after, rate.BrandName, month.MonthKey) is not null;
+            if (!wasConfirmed && !isConfirmed) continue;
+            if (old is null && !isConfirmed) continue;
+            if (old is not null && BrandMonthRules.SameValues(old, rate) && wasConfirmed == isConfirmed) continue;
             text.AppendLine($"{rate.BrandName} · ماه {month.MonthKey}");
             text.AppendLine($"مارک‌آپ پایه: {(old is null ? "ثبت نشده" : Rules.Percent(old.Markup))} ← {Rules.Percent(rate.Markup)}");
             text.AppendLine($"تخفیف خرید {Rules.Percent(rate.PurchaseDiscount)} · آفر {Rules.Percent(rate.Offer)} · نقدی {Rules.Percent(rate.CashShare)} · چکی {Rules.Percent(rate.CreditShare)} · تخفیف نقدی {Rules.Percent(rate.CashDiscount)}");
